@@ -6,8 +6,8 @@ export function ThreatIntelPanel({ threatIntelligence }: { threatIntelligence: T
 
   return (
     <div className="grid gap-6 sm:grid-cols-2">
-      <div className="rounded-xl border border-base-700 bg-base-900/40 p-5">
-        <h4 className="mb-3 text-sm font-semibold text-base-100">VirusTotal</h4>
+      <div className="card-elevated rounded-2xl border border-base-700 bg-base-900/60 p-6">
+        <h4 className="mb-3 text-sm font-bold text-base-100">VirusTotal</h4>
         {virustotal.status === "ok" && virustotal.data ? (
           <div className="space-y-2 text-sm text-base-300">
             <p>
@@ -27,8 +27,8 @@ export function ThreatIntelPanel({ threatIntelligence }: { threatIntelligence: T
         )}
       </div>
 
-      <div className="rounded-xl border border-base-700 bg-base-900/40 p-5">
-        <h4 className="mb-3 text-sm font-semibold text-base-100">AbuseIPDB</h4>
+      <div className="card-elevated rounded-2xl border border-base-700 bg-base-900/60 p-6">
+        <h4 className="mb-3 text-sm font-bold text-base-100">AbuseIPDB</h4>
         {abuseipdb.status === "ok" && abuseipdb.data ? (
           <div className="space-y-2 text-sm text-base-300">
             <p>

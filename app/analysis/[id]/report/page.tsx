@@ -37,7 +37,9 @@ export default async function ReportPage({ params }: PageProps) {
 
         <header className="mb-10 border-b-2 border-neutral-900 pb-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">SentinelScope Security Report</p>
-          <h1 className="mt-1 break-all text-3xl font-bold">{result.target}</h1>
+          <h1 title={result.target} className="line-clamp-2 mt-1 break-all text-2xl font-bold sm:text-3xl">
+            {result.target}
+          </h1>
           <p className="mt-2 text-sm text-neutral-600">
             Generated {formatDate(result.timestamp)} · Risk Score {result.riskScore}/100 ({RISK_LEVEL_LABEL[result.riskLevel]})
           </p>

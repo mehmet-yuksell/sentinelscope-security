@@ -4,9 +4,9 @@ import { formatDate } from "@/utils/riskDisplay";
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <div className="rounded-lg border border-base-700 bg-base-900/40 p-4">
-      <p className="text-xs uppercase tracking-widest text-base-500">{label}</p>
-      <p className={`mt-1 text-lg font-semibold ${tone ?? "text-base-100"}`}>{value}</p>
+    <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-widest text-base-500">{label}</p>
+      <p className={`mt-1.5 text-lg font-bold ${tone ?? "text-base-100"}`}>{value}</p>
     </div>
   );
 }
@@ -29,7 +29,7 @@ export function TlsPanel({ tls }: { tls: ProviderResult<TlsInfo> }) {
         <Stat label="Expires" value={t.daysRemaining === null ? "Unknown" : `${t.daysRemaining} days`} tone={expiryTone} />
       </div>
 
-      <div className="space-y-1 rounded-lg border border-base-700 bg-base-900/40 p-4 text-sm text-base-300">
+      <div className="card-elevated space-y-1.5 rounded-xl border border-base-700 bg-base-900/50 p-5 text-sm text-base-300">
         <p>
           <span className="text-base-500">Subject:</span> {t.subject ?? "Unknown"}
         </p>

@@ -48,16 +48,21 @@ interface PipelineProgressProps {
 
 export function PipelineProgress({ statuses }: PipelineProgressProps) {
   return (
-    <div className="w-full max-w-md rounded-xl border border-base-700 bg-base-900/60 p-5 font-mono text-sm">
-      <ul className="space-y-2.5">
+    <div className="card-elevated w-full max-w-md rounded-2xl border border-base-700 bg-base-900/70 p-6 font-mono text-sm backdrop-blur">
+      <ul className="space-y-3">
         {STAGE_ORDER.map((stage) => {
           const status = statuses[stage] ?? "pending";
           return (
             <li key={stage} className="flex items-center justify-between gap-4">
-              <span className={status === "pending" ? "text-base-500" : "text-base-100"}>
+              <span className={`font-medium tracking-wide ${status === "pending" ? "text-base-600" : "text-base-100"}`}>
                 {STAGE_LABEL[stage].toUpperCase()}
               </span>
-              <span className={`text-base ${STATUS_CLASS[status]}`}>{STATUS_GLYPH[status]}</span>
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-base ${STATUS_CLASS[status]}`}
+                style={status === "success" ? { textShadow: "0 0 8px rgba(45, 212, 191, 0.7)" } : undefined}
+              >
+                {STATUS_GLYPH[status]}
+              </span>
             </li>
           );
         })}

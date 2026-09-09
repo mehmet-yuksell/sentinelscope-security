@@ -96,17 +96,17 @@ export function AnalyzeForm() {
           placeholder="example.com, https://example.com, or 8.8.8.8"
           aria-label="Target domain, URL, or IP address"
           disabled={phase === "running"}
-          className="w-full flex-1 rounded-lg border border-base-600 bg-base-900 px-4 py-3 font-mono text-sm text-base-100 placeholder:text-base-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500 disabled:opacity-60"
+          className="card-elevated w-full flex-1 rounded-xl border border-base-600 bg-base-900 px-5 py-4 font-mono text-sm text-base-100 placeholder:text-base-500 transition focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500 disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={phase === "running" || !target.trim()}
-          className="whitespace-nowrap rounded-lg bg-accent-500 px-6 py-3 text-sm font-semibold text-base-950 transition hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="glow-accent whitespace-nowrap rounded-xl bg-accent-500 px-7 py-4 text-sm font-bold text-base-950 transition hover:bg-accent-400 hover:shadow-accent-500/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
         >
           {phase === "running" ? "Analyzing…" : "Analyze Target"}
         </button>
       </form>
-      <p className="text-xs uppercase tracking-widest text-base-500">
+      <p className="text-xs font-medium uppercase tracking-[0.2em] text-base-500">
         Passive analysis · DNS · TLS · HTTP · Threat Intelligence
       </p>
 

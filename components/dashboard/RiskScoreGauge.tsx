@@ -16,9 +16,9 @@ export function RiskScoreGauge({ score, level }: RiskScoreGaugeProps) {
   const offset = CIRCUMFERENCE * (1 - score / 100);
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-3">
       <div
-        className="relative h-44 w-44"
+        className="relative h-48 w-48"
         style={
           {
             "--dash-full": CIRCUMFERENCE,
@@ -26,27 +26,32 @@ export function RiskScoreGauge({ score, level }: RiskScoreGaugeProps) {
           } as React.CSSProperties
         }
       >
-        <svg viewBox="0 0 160 160" className="h-full w-full -rotate-90">
-          <circle cx="80" cy="80" r={RADIUS} fill="none" stroke="#1f242e" strokeWidth="12" />
+        <div className="absolute inset-6 rounded-full blur-2xl" style={{ backgroundColor: `${color}33` }} />
+        <svg viewBox="0 0 160 160" className="relative h-full w-full -rotate-90">
+          <circle cx="80" cy="80" r={RADIUS} fill="none" stroke="#1a1f28" strokeWidth="13" />
           <circle
             cx="80"
             cy="80"
             r={RADIUS}
             fill="none"
             stroke={color}
-            strokeWidth="12"
+            strokeWidth="13"
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={CIRCUMFERENCE}
             className="animate-scoreIn"
+            style={{ filter: `drop-shadow(0 0 10px ${color}99)` }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-4xl font-bold text-base-50">{score}</span>
-          <span className="text-xs text-base-500">/ 100</span>
+          <span className="text-5xl font-extrabold tracking-tight text-white">{score}</span>
+          <span className="text-xs font-medium uppercase tracking-widest text-base-500">/ 100</span>
         </div>
       </div>
-      <span className="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ color, backgroundColor: `${color}1a` }}>
+      <span
+        className="rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider"
+        style={{ color, backgroundColor: `${color}1f`, boxShadow: `0 0 0 1px ${color}33` }}
+      >
         {RISK_LEVEL_LABEL[level]}
       </span>
     </div>

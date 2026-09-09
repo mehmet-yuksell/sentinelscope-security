@@ -4,11 +4,11 @@ import { ProviderStatusNotice } from "./ProviderStatusNotice";
 function RecordGroup({ title, values }: { title: string; values: string[] }) {
   if (values.length === 0) return null;
   return (
-    <div>
-      <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-base-500">{title}</h4>
-      <ul className="space-y-1">
+    <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
+      <h4 className="mb-2 text-xs font-bold uppercase tracking-widest text-accent-400">{title}</h4>
+      <ul className="space-y-1.5">
         {values.map((value) => (
-          <li key={value} className="break-all rounded bg-base-800/60 px-3 py-1.5 font-mono text-sm text-base-200">
+          <li key={value} className="break-all rounded-lg bg-base-950/60 px-3 py-2 font-mono text-sm text-base-200">
             {value}
           </li>
         ))}
@@ -35,9 +35,9 @@ export function DnsPanel({ dns }: { dns: ProviderResult<DnsRecordSet> }) {
       <RecordGroup title="CAA" values={d.caa.map((c) => `flags=${c.critical} ${c.issue ?? c.issuewild ?? c.iodef ?? ""}`)} />
 
       {d.soa && (
-        <div>
-          <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-base-500">SOA</h4>
-          <div className="space-y-0.5 rounded bg-base-800/60 px-3 py-2 font-mono text-xs text-base-300">
+        <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
+          <h4 className="mb-2 text-xs font-bold uppercase tracking-widest text-accent-400">SOA</h4>
+          <div className="space-y-1 rounded-lg bg-base-950/60 px-3 py-2.5 font-mono text-xs text-base-300">
             <p>Primary NS: {d.soa.nsname}</p>
             <p>Serial: {d.soa.serial}</p>
             <p>
@@ -47,9 +47,9 @@ export function DnsPanel({ dns }: { dns: ProviderResult<DnsRecordSet> }) {
         </div>
       )}
 
-      <div>
-        <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-base-500">DMARC</h4>
-        <p className="break-all rounded bg-base-800/60 px-3 py-2 font-mono text-xs text-base-300">
+      <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
+        <h4 className="mb-2 text-xs font-bold uppercase tracking-widest text-accent-400">DMARC</h4>
+        <p className="break-all rounded-lg bg-base-950/60 px-3 py-2.5 font-mono text-xs text-base-300">
           {d.dmarcRecord ?? "Not configured"}
         </p>
       </div>

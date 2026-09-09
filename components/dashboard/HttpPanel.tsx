@@ -16,7 +16,7 @@ export function HttpPanel({ http, technologies }: HttpPanelProps) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1 rounded-lg border border-base-700 bg-base-900/40 p-4 text-sm text-base-300">
+      <div className="card-elevated space-y-1.5 rounded-xl border border-base-700 bg-base-900/50 p-5 text-sm text-base-300">
         <p>
           <span className="text-base-500">Final URL:</span> <span className="font-mono">{h.finalUrl}</span>
         </p>
@@ -36,16 +36,19 @@ export function HttpPanel({ http, technologies }: HttpPanelProps) {
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-base-500">HTTP Security Headers</h4>
-        <ul className="divide-y divide-base-800 rounded-lg border border-base-800">
+        <h4 className="mb-2.5 text-xs font-bold uppercase tracking-widest text-base-500">HTTP Security Headers</h4>
+        <ul className="card-elevated divide-y divide-base-800 overflow-hidden rounded-xl border border-base-700 bg-base-900/50">
           {h.securityHeaders.map((check) => (
-            <li key={check.header} className="flex items-start justify-between gap-4 px-4 py-3">
+            <li key={check.header} className="flex items-start justify-between gap-4 px-5 py-4">
               <div className="min-w-0">
-                <p className="font-mono text-sm text-base-100">{check.header}</p>
+                <p className="font-mono text-sm font-semibold text-base-100">{check.header}</p>
                 <p className="text-xs text-base-500">{check.description}</p>
-                {check.value && <p className="mt-1 break-all font-mono text-xs text-base-400">{check.value}</p>}
+                {check.value && <p className="mt-1.5 break-all rounded bg-base-950/60 px-2 py-1 font-mono text-xs text-base-400">{check.value}</p>}
               </div>
-              <span className="shrink-0 text-lg font-bold" style={{ color: HEADER_STATUS_COLOR[check.status] }}>
+              <span
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                style={{ color: HEADER_STATUS_COLOR[check.status], backgroundColor: `${HEADER_STATUS_COLOR[check.status]}1a` }}
+              >
                 {HEADER_STATUS_ICON[check.status]}
               </span>
             </li>
@@ -55,13 +58,13 @@ export function HttpPanel({ http, technologies }: HttpPanelProps) {
 
       {technologies.length > 0 && (
         <div>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-base-500">Technology Detected</h4>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <h4 className="mb-2.5 text-xs font-bold uppercase tracking-widest text-base-500">Technology Detected</h4>
+          <div className="grid gap-3 sm:grid-cols-2">
             {technologies.map((tech) => (
-              <div key={`${tech.category}-${tech.name}`} className="rounded-lg border border-base-800 bg-base-900/40 px-3 py-2">
-                <p className="text-xs uppercase tracking-widest text-base-500">{tech.category}</p>
-                <p className="text-sm text-base-100">
-                  {tech.name} <span className="text-xs text-base-500">({tech.confidence} confidence)</span>
+              <div key={`${tech.category}-${tech.name}`} className="card-elevated rounded-xl border border-base-700 bg-base-900/50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-widest text-accent-400">{tech.category}</p>
+                <p className="mt-0.5 text-sm font-medium text-base-100">
+                  {tech.name} <span className="text-xs font-normal text-base-500">({tech.confidence} confidence)</span>
                 </p>
               </div>
             ))}

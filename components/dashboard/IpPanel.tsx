@@ -19,14 +19,14 @@ export function IpPanel({ ip }: { ip: ProviderResult<IpIntelInfo> }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {rows.map(([label, value]) => (
-        <div key={label} className="rounded-lg border border-base-700 bg-base-900/40 p-4">
-          <p className="text-xs uppercase tracking-widest text-base-500">{label}</p>
-          <p className="mt-1 break-all font-mono text-sm text-base-100">{value}</p>
+        <div key={label} className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-base-500">{label}</p>
+          <p className="mt-1.5 break-all font-mono text-sm font-medium text-base-100">{value}</p>
         </div>
       ))}
       {d.isDatacenter !== null && (
-        <div className="rounded-lg border border-base-700 bg-base-900/40 p-4 sm:col-span-2">
-          <p className="text-xs uppercase tracking-widest text-base-500">Hosting Type (heuristic)</p>
+        <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4 sm:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-base-500">Hosting Type (heuristic)</p>
           <p className="mt-1 text-sm text-base-100">
             {d.isDatacenter ? "Likely datacenter / cloud hosting" : "Likely non-datacenter network"}
           </p>

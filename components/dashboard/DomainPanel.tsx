@@ -12,21 +12,21 @@ export function DomainPanel({ domain }: { domain: ProviderResult<DomainIntelInfo
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border border-base-700 bg-base-900/40 p-4">
-          <p className="text-xs uppercase tracking-widest text-base-500">Registrar</p>
-          <p className="mt-1 text-sm text-base-100">{d.registrar ?? "Unknown"}</p>
+        <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-base-500">Registrar</p>
+          <p className="mt-1.5 text-sm font-medium text-base-100">{d.registrar ?? "Unknown"}</p>
         </div>
-        <div className="rounded-lg border border-base-700 bg-base-900/40 p-4">
-          <p className="text-xs uppercase tracking-widest text-base-500">Registered</p>
-          <p className="mt-1 text-sm text-base-100">{formatDate(d.createdDate)}</p>
+        <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-base-500">Registered</p>
+          <p className="mt-1.5 text-sm font-medium text-base-100">{formatDate(d.createdDate)}</p>
         </div>
-        <div className="rounded-lg border border-base-700 bg-base-900/40 p-4">
-          <p className="text-xs uppercase tracking-widest text-base-500">Expires</p>
-          <p className="mt-1 text-sm text-base-100">{formatDate(d.expiresDate)}</p>
+        <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-base-500">Expires</p>
+          <p className="mt-1.5 text-sm font-medium text-base-100">{formatDate(d.expiresDate)}</p>
         </div>
-        <div className="rounded-lg border border-base-700 bg-base-900/40 p-4">
-          <p className="text-xs uppercase tracking-widest text-base-500">Domain Age</p>
-          <p className="mt-1 text-sm text-base-100">{d.domainAgeDays !== null ? `${d.domainAgeDays} days` : "Unknown"}</p>
+        <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-base-500">Domain Age</p>
+          <p className="mt-1.5 text-sm font-medium text-base-100">{d.domainAgeDays !== null ? `${d.domainAgeDays} days` : "Unknown"}</p>
         </div>
       </div>
 
