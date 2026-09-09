@@ -1,0 +1,79 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import type { AnalysisResult } from "@/types/analysis";
+import { RISK_LEVEL_COLOR, RISK_LEVEL_LABEL, formatDate } from "@/utils/riskDisplay";
+import { OverviewPanel } from "./OverviewPanel";
+import { DnsPanel } from "./DnsPanel";
+import { TlsPanel } from "./TlsPanel";
+import { HttpPanel } from "./HttpPanel";
+import { IpPanel } from "./IpPanel";
+import { DomainPanel } from "./DomainPanel";
+import { ThreatIntelPanel } from "./ThreatIntelPanel";
+import { FindingsPanel } from "./FindingsPanel";
+
+const TABS = ["Overview", "DNS", "TLS", "HTTP", "IP", "Domain", "Threat Intelligence", "Findings"] as const;
+type Tab = (typeof TABS)[number];
+
+export function AnalysisDashboard({ result }: { result: AnalysisResult }) {
+  const [tab, setTab] = useState<Tab>("Overview");
+  const color = RISK_LEVEL_COLOR[result.riskLevel];
+
+  return (
+    <div className="mx-auto max-w-5xl px-6 py-12">
+      <div className="mb-8 flex flex-col gap-6 rounded-xl border border-base-700 bg-base-900/50 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-base-500">Target</p>
+          <h1 className="break-all text-2xl font-bold text-base-50">{result.target}</h1>
+          <p className="mt-1 text-xs text-base-500">
+            Analyzed {formatDate(result.timestamp)} · {(result.durationMs / 1000).toFixed(1)}s pipeline duration
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-xs uppercase tracking-widest text-base-500">Risk Score</p>
+            <p className="text-3xl font-bold" style={{ color }}>
+              {result.riskScore}
+              <span className="text-base text-base-500">/100</span>
+            </p>
+            <p className="text-xs font-semibold" style={{ color }}>
+              {RISK_LEVEL_LABEL[result.riskLevel]}
+            </p>
+          </div>
+          <Link
+            href={`/analysis/${result.id}/report`}
+            className="whitespace-nowrap rounded-lg border border-base-600 px-4 py-2 text-sm text-base-200 transition hover:border-accent-500 hover:text-accent-400"
+          >
+            Generate Report
+          </Link>
+        </div>
+      </div>
+
+      <div className="no-print mb-6 flex gap-1 overflow-x-auto rounded-lg border border-base-800 bg-base-900/40 p-1 scrollbar-thin">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition ${
+              tab === t ? "bg-accent-500 text-base-950" : "text-base-400 hover:text-base-100"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <div className="animate-fadeIn">
+        {tab === "Overview" && <OverviewPanel result={result} />}
+        {tab === "DNS" && <DnsPanel dns={result.dns} />}
+        {tab === "TLS" && <TlsPanel tls={result.tls} />}
+        {tab === "HTTP" && <HttpPanel http={result.http} technologies={result.technologies} />}
+        {tab === "IP" && <IpPanel ip={result.ip} />}
+        {tab === "Domain" && <DomainPanel domain={result.domain} />}
+        {tab === "Threat Intelligence" && <ThreatIntelPanel threatIntelligence={result.threatIntelligence} />}
+        {tab === "Findings" && <FindingsPanel findings={result.findings} />}
+      </div>
+    </div>
+  );
+}

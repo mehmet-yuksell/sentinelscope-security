@@ -1,0 +1,67 @@
+import type { PipelineStage } from "@/types/analysis";
+
+export type LiveStageStatus = "pending" | "running" | "success" | "failed" | "skipped";
+
+export const STAGE_ORDER: PipelineStage[] = [
+  "validation",
+  "dns",
+  "ip",
+  "tls",
+  "http",
+  "technology",
+  "domain",
+  "threat_intelligence",
+  "risk_engine",
+];
+
+export const STAGE_LABEL: Record<PipelineStage, string> = {
+  validation: "Target Validation",
+  dns: "DNS Intelligence",
+  ip: "IP Intelligence",
+  tls: "TLS Analysis",
+  http: "HTTP Analysis",
+  technology: "Technology Detection",
+  domain: "Domain Intelligence",
+  threat_intelligence: "Threat Intelligence",
+  risk_engine: "Risk Engine",
+};
+
+const STATUS_GLYPH: Record<LiveStageStatus, string> = {
+  pending: "·",
+  running: "◌",
+  success: "✓",
+  failed: "✕",
+  skipped: "—",
+};
+
+const STATUS_CLASS: Record<LiveStageStatus, string> = {
+  pending: "text-base-500",
+  running: "text-accent-400 animate-pulse",
+  success: "text-accent-500",
+  failed: "text-risk-critical",
+  skipped: "text-base-500",
+};
+
+interface PipelineProgressProps {
+  statuses: Record<PipelineStage, LiveStageStatus>;
+}
+
+export function PipelineProgress({ statuses }: PipelineProgressProps) {
+  return (
+    <div className="w-full max-w-md rounded-xl border border-base-700 bg-base-900/60 p-5 font-mono text-sm">
+      <ul className="space-y-2.5">
+        {STAGE_ORDER.map((stage) => {
+          const status = statuses[stage] ?? "pending";
+          return (
+            <li key={stage} className="flex items-center justify-between gap-4">
+              <span className={status === "pending" ? "text-base-500" : "text-base-100"}>
+                {STAGE_LABEL[stage].toUpperCase()}
+              </span>
+              <span className={`text-base ${STATUS_CLASS[status]}`}>{STATUS_GLYPH[status]}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}

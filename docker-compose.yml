@@ -1,0 +1,21 @@
+services:
+  sentinelscope:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
+      URLSCAN_API_KEY: ${URLSCAN_API_KEY:-}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-10}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      ANALYSIS_CACHE_TTL_MS: ${ANALYSIS_CACHE_TTL_MS:-300000}
+    volumes:
+      - sentinelscope-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  sentinelscope-data:

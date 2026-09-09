@@ -1,0 +1,39 @@
+{
+  "name": "sentinelscope",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Passive website and domain threat intelligence platform with DNS, TLS, HTTP, IP and reputation analysis.",
+  "author": "Mehmet Yuksel",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "next": "16.3.4",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "recharts": "2.15.1",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.0",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "autoprefixer": "10.4.19",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.4",
+    "postcss": "8.5.28",
+    "tailwindcss": "3.4.4",
+    "typescript": "5.4.5",
+    "vitest": "5.0.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
