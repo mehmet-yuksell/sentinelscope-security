@@ -52,6 +52,42 @@ export const PROVIDER_STATUS_LABEL: Record<ProviderStatus, string> = {
   demo: "Demo Data",
 };
 
+export type SecurityGrade = "A+" | "A" | "B" | "C" | "D" | "F";
+
+/** A letter-grade complement to the numeric score — the pattern SSL Labs and
+ * SecurityHeaders.com use, and a more immediately legible signal than a bare
+ * percentage for "how good is this, at a glance". */
+export function scoreToGrade(score: number): SecurityGrade {
+  if (score < 5) return "A+";
+  if (score < 20) return "A";
+  if (score < 35) return "B";
+  if (score < 50) return "C";
+  if (score < 70) return "D";
+  return "F";
+}
+
+export const GRADE_COLOR: Record<SecurityGrade, string> = {
+  "A+": "#2dd4bf",
+  A: "#5eead4",
+  B: "#60a5fa",
+  C: "#eab308",
+  D: "#f97316",
+  F: "#ef4444",
+};
+
+/**
+ * Deterministically maps a hostname to a hue within the brand's teal→blue→
+ * violet range, so each target's "Security DNA" visual carries a subtle,
+ * unique tint — a fingerprint, not a random color per render.
+ */
+export function hostnameToHue(hostname: string): number {
+  let hash = 0;
+  for (let i = 0; i < hostname.length; i++) {
+    hash = (hash * 31 + hostname.charCodeAt(i)) >>> 0;
+  }
+  return 165 + (hash % 105); // 165 (teal) .. 270 (violet)
+}
+
 export function formatRelativeTime(isoTimestamp: string): string {
   const date = new Date(isoTimestamp);
   const diffMs = Date.now() - date.getTime();

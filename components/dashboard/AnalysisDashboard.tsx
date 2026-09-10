@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { AnalysisResult } from "@/types/analysis";
-import { RISK_LEVEL_COLOR, RISK_LEVEL_LABEL, formatDate } from "@/utils/riskDisplay";
+import { RISK_LEVEL_COLOR, RISK_LEVEL_LABEL, formatDate, scoreToGrade } from "@/utils/riskDisplay";
+import { SiteNav } from "@/components/SiteNav";
 import { OverviewPanel } from "./OverviewPanel";
 import { DnsPanel } from "./DnsPanel";
 import { TlsPanel } from "./TlsPanel";
@@ -20,8 +21,12 @@ export function AnalysisDashboard({ result }: { result: AnalysisResult }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const color = RISK_LEVEL_COLOR[result.riskLevel];
 
+  const grade = scoreToGrade(result.riskScore);
+
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12">
+    <div>
+      <SiteNav />
+      <div className="mx-auto max-w-5xl px-6 pb-12">
       <div
         className="card-elevated relative mb-8 flex flex-col gap-6 overflow-hidden rounded-2xl border border-base-700 bg-base-900/60 p-7 sm:flex-row sm:items-center sm:justify-between"
       >
@@ -39,15 +44,20 @@ export function AnalysisDashboard({ result }: { result: AnalysisResult }) {
           </p>
         </div>
         <div className="relative flex items-center gap-5">
-          <div className="text-right">
-            <p className="text-xs font-semibold uppercase tracking-widest text-base-500">Risk Score</p>
-            <p className="text-4xl font-extrabold tracking-tight" style={{ color }}>
-              {result.riskScore}
-              <span className="text-base font-medium text-base-500">/100</span>
-            </p>
-            <p className="text-xs font-bold uppercase tracking-wide" style={{ color }}>
-              {RISK_LEVEL_LABEL[result.riskLevel]}
-            </p>
+          <div className="flex items-center gap-3">
+            <span className="text-3xl font-black" style={{ color }}>
+              {grade}
+            </span>
+            <div className="text-right">
+              <p className="text-xs font-semibold uppercase tracking-widest text-base-500">Risk Score</p>
+              <p className="text-3xl font-extrabold tracking-tight" style={{ color }}>
+                {result.riskScore}
+                <span className="text-base font-medium text-base-500">/100</span>
+              </p>
+              <p className="text-xs font-bold uppercase tracking-wide" style={{ color }}>
+                {RISK_LEVEL_LABEL[result.riskLevel]}
+              </p>
+            </div>
           </div>
           <Link
             href={`/analysis/${result.id}/report`}
@@ -81,6 +91,7 @@ export function AnalysisDashboard({ result }: { result: AnalysisResult }) {
         {tab === "Domain" && <DomainPanel domain={result.domain} />}
         {tab === "Threat Intelligence" && <ThreatIntelPanel threatIntelligence={result.threatIntelligence} />}
         {tab === "Findings" && <FindingsPanel findings={result.findings} />}
+      </div>
       </div>
     </div>
   );

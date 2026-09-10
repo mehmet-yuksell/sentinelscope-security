@@ -1,7 +1,7 @@
 "use client";
 
 import type { RiskLevel } from "@/types/analysis";
-import { RISK_LEVEL_COLOR, RISK_LEVEL_LABEL } from "@/utils/riskDisplay";
+import { RISK_LEVEL_COLOR, RISK_LEVEL_LABEL, scoreToGrade } from "@/utils/riskDisplay";
 
 interface RiskScoreGaugeProps {
   score: number;
@@ -14,6 +14,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 export function RiskScoreGauge({ score, level }: RiskScoreGaugeProps) {
   const color = RISK_LEVEL_COLOR[level];
   const offset = CIRCUMFERENCE * (1 - score / 100);
+  const grade = scoreToGrade(score);
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -44,8 +45,10 @@ export function RiskScoreGauge({ score, level }: RiskScoreGaugeProps) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-5xl font-extrabold tracking-tight text-white">{score}</span>
-          <span className="text-xs font-medium uppercase tracking-widest text-base-500">/ 100</span>
+          <span className="text-6xl font-black tracking-tight" style={{ color }}>
+            {grade}
+          </span>
+          <span className="mt-1 font-mono text-xs font-semibold text-base-400">{score} / 100</span>
         </div>
       </div>
       <span

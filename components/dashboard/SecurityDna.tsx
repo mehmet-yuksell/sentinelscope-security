@@ -2,38 +2,53 @@
 
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer } from "recharts";
 import type { RiskFactorScore } from "@/types/analysis";
+import { hostnameToHue } from "@/utils/riskDisplay";
 
 interface SecurityDnaProps {
   factors: RiskFactorScore[];
+  hostname: string;
 }
 
-/** Visual signature of a target's security posture across every scored dimension. */
-export function SecurityDna({ factors }: SecurityDnaProps) {
+/**
+ * A per-target visual signature across every scored dimension — the hue is
+ * deterministically derived from the hostname (not random per render), so
+ * the same target always renders the same fingerprint while different
+ * targets are visibly distinct from one another.
+ */
+export function SecurityDna({ factors, hostname }: SecurityDnaProps) {
+  const hue = hostnameToHue(hostname);
+  const stroke = `hsl(${hue}, 85%, 60%)`;
+  const gradientId = `securityDnaFill-${hue}`;
+
   const data = factors.map((factor) => ({
     label: factor.label,
     health: factor.applicable ? 100 - factor.score : 0,
   }));
 
   return (
-    <div className="card-elevated rounded-2xl border border-base-700 bg-base-900/60 p-6">
-      <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-base-500">Security DNA</h3>
-      <div className="h-72 w-full sm:h-80">
+    <div className="card-elevated relative overflow-hidden rounded-2xl border border-base-700 bg-base-900/60 p-6">
+      <div className="pointer-events-none absolute -left-16 -top-16 h-56 w-56 rounded-full blur-3xl" style={{ backgroundColor: `hsla(${hue}, 85%, 55%, 0.12)` }} />
+      <div className="relative mb-1 flex items-baseline justify-between">
+        <h3 className="text-xs font-bold uppercase tracking-widest text-base-500">Security DNA</h3>
+        <span className="font-mono text-[10px] text-base-600">fingerprint · {hostname}</span>
+      </div>
+      <div className="relative h-72 w-full sm:h-96">
         <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={data} outerRadius="55%" margin={{ top: 16, right: 40, bottom: 16, left: 40 }}>
+          <RadarChart data={data} outerRadius="62%" margin={{ top: 16, right: 48, bottom: 16, left: 48 }}>
             <defs>
-              <radialGradient id="securityDnaFill" cx="50%" cy="50%" r="65%">
-                <stop offset="0%" stopColor="#2dd4bf" stopOpacity={0.45} />
-                <stop offset="100%" stopColor="#2dd4bf" stopOpacity={0.08} />
+              <radialGradient id={gradientId} cx="50%" cy="50%" r="65%">
+                <stop offset="0%" stopColor={stroke} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={stroke} stopOpacity={0.06} />
               </radialGradient>
             </defs>
             <PolarGrid stroke="#2a303c" />
-            <PolarAngleAxis dataKey="label" tick={{ fill: "#9ba3b3", fontSize: 10, fontWeight: 600 }} />
+            <PolarAngleAxis dataKey="label" tick={{ fill: "#9ba3b3", fontSize: 11, fontWeight: 600 }} />
             <Radar
               dataKey="health"
-              stroke="#2dd4bf"
-              fill="url(#securityDnaFill)"
-              strokeWidth={2.5}
-              style={{ filter: "drop-shadow(0 0 6px rgba(45, 212, 191, 0.5))" }}
+              stroke={stroke}
+              fill={`url(#${gradientId})`}
+              strokeWidth={3}
+              style={{ filter: `drop-shadow(0 0 8px ${stroke})` }}
             />
           </RadarChart>
         </ResponsiveContainer>

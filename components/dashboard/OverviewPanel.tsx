@@ -17,7 +17,7 @@ export function OverviewPanel({ result }: { result: AnalysisResult }) {
         <SecurityOverview factors={result.risk.factors} />
       </div>
 
-      <SecurityDna factors={result.risk.factors} />
+      <SecurityDna factors={result.risk.factors} hostname={result.hostname} />
 
       <div>
         <h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-base-500">Top Findings</h3>
