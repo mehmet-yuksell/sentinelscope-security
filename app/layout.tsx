@@ -32,7 +32,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="min-h-screen bg-base-950 font-sans antialiased">{children}</body>
+      <body className="min-h-screen bg-base-950 font-sans antialiased">
+        {children}
+        <footer className="no-print py-6 text-center text-[11px] text-base-600">© 2026 Mehmet Yüksel</footer>
+      </body>
     </html>
   );
 }
