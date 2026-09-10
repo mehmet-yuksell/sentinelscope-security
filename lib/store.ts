@@ -22,4 +22,3 @@ const store = createStore();
 
 export const saveAnalysis = store.saveAnalysis;
 export const getAnalysis = store.getAnalysis;
-export const listHistory = store.listHistory;

@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import type { PipelineStage, PipelineStageResult } from "@/types/analysis";
+import type { AnalysisResult, PipelineStage, PipelineStageResult } from "@/types/analysis";
 import { PipelineProgress, STAGE_ORDER, type LiveStageStatus } from "@/components/PipelineProgress";
+import { addRecentAnalysis } from "@/utils/clientHistory";
 
 type Phase = "idle" | "running" | "error";
 
@@ -63,7 +64,7 @@ export function AnalyzeForm() {
           if (!line.startsWith("data:")) continue;
           const payload = JSON.parse(line.slice(5).trim()) as
             | { type: "stage"; stage: PipelineStageResult }
-            | { type: "result"; data: { id: string } }
+            | { type: "result"; data: AnalysisResult }
             | { type: "error"; message: string };
 
           if (payload.type === "stage") {
@@ -72,7 +73,9 @@ export function AnalyzeForm() {
               [payload.stage.stage]: payload.stage.status === "success" ? "success" : payload.stage.status === "skipped" ? "skipped" : "failed",
             }));
           } else if (payload.type === "result") {
-            router.push(`/analysis/${payload.data.id}`);
+            const { id, target: analyzedTarget, timestamp, riskScore, riskLevel } = payload.data;
+            addRecentAnalysis({ id, target: analyzedTarget, timestamp, riskScore, riskLevel });
+            router.push(`/analysis/${id}`);
             return;
           } else if (payload.type === "error") {
             throw new Error(payload.message);

@@ -44,7 +44,8 @@ explicitly rather than showing a fabricated value.
 - **Security Findings** — each finding carries severity, evidence, and a
   concrete recommendation
 - **Report Generation** — a print-friendly report per analysis
-- **Analysis History** — recent scans, persisted locally
+- **Analysis History** — each visitor's own recent scans, kept in their
+  browser only (never a server-side feed other visitors can see)
 
 ## Architecture
 
@@ -68,8 +69,13 @@ explicitly rather than showing a fabricated value.
                                  |
                      Normalized AnalysisResult
                                  |
-                    File-backed store (history)
+                  Store, keyed by id (file or Redis)
 ```
+
+Each result is stored only under its own unguessable id, for direct
+`/analysis/[id]` links — there is no server-side "list everything"
+endpoint. A visitor's "recent analyses" list is local to their browser
+(see [Security](#security)).
 
 Every outbound connection to a **user-supplied** target — the initial
 request and every HTTP redirect hop — is routed through
@@ -143,6 +149,12 @@ UI reflects actual backend timing — not a fake loading animation.
 - **Secrets never reach the client.** Third-party API keys live in
   server-side environment variables and are read only inside
   `services/threat-intelligence`.
+- **No cross-visitor history leak.** A direct `/analysis/[id]` link is
+  intentionally shareable (its id is an unguessable UUID), but there is no
+  server endpoint that lists every analysis ever run. Each visitor's
+  "recent analyses" list is written to and read from their own browser's
+  `localStorage` only (`utils/clientHistory.ts`) — the server never learns
+  what any other visitor has queried.
 
 ## Risk Methodology
 
@@ -274,15 +286,15 @@ sentinelscope/
 ├── app/                      # Next.js App Router pages & API routes
 │   ├── api/
 │   │   ├── analyze/          # POST /api/analyze (JSON) and /stream (SSE)
-│   │   ├── analysis/[id]/    # GET a stored analysis
-│   │   └── history/          # GET recent analyses
+│   │   └── analysis/[id]/    # GET a single stored analysis by id
 │   └── analysis/[id]/        # Dashboard + print-friendly report pages
 ├── components/                # UI components (dashboard/, form, pipeline)
+├── utils/clientHistory.ts     # Per-browser "recent analyses" (localStorage only)
 ├── lib/
 │   ├── security/ssrf.ts       # Reserved-address-space checks
 │   ├── net/safeRequest.ts     # SSRF-safe HTTP client with redirect pinning
 │   ├── validation/target.ts   # Target parsing/validation
-│   ├── store/                 # File store (local/Docker) + Redis store (serverless)
+│   ├── store/                 # File store (local/Docker) + Redis store (serverless), by-id only
 │   ├── rateLimit.ts, cache.ts, store.ts, analyzeShared.ts
 ├── services/
 │   ├── dns/ tls/ http/ ip/ domain/ technology/ threat-intelligence/
@@ -304,11 +316,12 @@ sentinelscope/
   RDAP data; the Domain tab degrades gracefully when that happens.
 - **The `isDatacenter` flag is a heuristic** derived from the IP
   organization string, not an authoritative classification.
-- **History storage is a single JSON file by default** (local dev, Docker,
-  a VPS) — sufficient for a demo, not a production-scale datastore. On
-  serverless (Vercel), configure `UPSTASH_REDIS_REST_URL`/`_TOKEN` (see
-  [Deployment](#deployment)); without it, `/analysis/[id]` links and the
-  rate limiter aren't reliable across stateless instances.
+- **Individual results are stored server-side by id** — a JSON file by
+  default (local dev, Docker, a VPS), Redis on serverless (see
+  [Deployment](#deployment); without it, `/analysis/[id]` links and the
+  rate limiter aren't reliable across Vercel's stateless instances). There
+  is no server-side "list everything" endpoint — the aggregate "recent
+  analyses" list is per-browser `localStorage` only, by design.
 - **No authentication.** This is a public demo tool by design; add auth
   before deploying it as anything more than a personal/portfolio instance.
 

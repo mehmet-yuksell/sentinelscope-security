@@ -36,3 +36,9 @@ next-env.d.ts
 /coverage
 
 .vercel
+.env*
+
+# AI agent skill docs auto-installed by Vercel Marketplace integrations
+.agents/
+.claude/
+skills-lock.json

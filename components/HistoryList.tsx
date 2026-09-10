@@ -4,32 +4,31 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { HistoryEntry } from "@/types/analysis";
 import { RISK_LEVEL_COLOR, formatRelativeTime } from "@/utils/riskDisplay";
+import { getRecentAnalyses } from "@/utils/clientHistory";
 
+/**
+ * Shows only THIS browser's own recent analyses, read from localStorage —
+ * never fetched from the server, so no visitor can see another visitor's
+ * queried targets.
+ */
 export function HistoryList() {
-  const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
+  const [entries, setEntries] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/history")
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: HistoryEntry[]) => {
-        if (!cancelled) setEntries(data);
-      })
-      .catch(() => {
-        if (!cancelled) setEntries([]);
-      });
-    return () => {
-      cancelled = true;
-    };
+    // localStorage is only readable client-side and would mismatch the
+    // server-rendered markup if read during render, so this intentionally
+    // reads once after mount rather than during the initial render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEntries(getRecentAnalyses());
   }, []);
 
-  if (!entries || entries.length === 0) return null;
+  if (entries.length === 0) return null;
 
   return (
     <div className="w-full max-w-2xl">
-      <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-base-500">Recent Analyses</h2>
+      <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-base-500">Your Recent Analyses</h2>
       <ul className="card-elevated divide-y divide-base-800 overflow-hidden rounded-2xl border border-base-700 bg-base-900/50">
-        {entries.slice(0, 6).map((entry) => (
+        {entries.map((entry) => (
           <li key={entry.id}>
             <Link
               href={`/analysis/${entry.id}`}
@@ -50,6 +49,7 @@ export function HistoryList() {
           </li>
         ))}
       </ul>
+      <p className="mt-2 text-[11px] text-base-600">Only visible in this browser — never shared with other visitors.</p>
     </div>
   );
 }

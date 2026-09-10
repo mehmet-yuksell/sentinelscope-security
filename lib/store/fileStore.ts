@@ -52,16 +52,5 @@ export function createFileStore(): AnalysisStore {
       const all = await readAll();
       return all.find((r) => r.id === id) ?? null;
     },
-
-    async listHistory(limit = 25) {
-      const all = await readAll();
-      return all.slice(0, limit).map((r) => ({
-        id: r.id,
-        target: r.target,
-        timestamp: r.timestamp,
-        riskScore: r.riskScore,
-        riskLevel: r.riskLevel,
-      }));
-    },
   };
 }
