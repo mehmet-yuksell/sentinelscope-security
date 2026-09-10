@@ -1,14 +1,27 @@
+import { Redis } from "@upstash/redis";
+
+export interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  retryAfterMs: number;
+}
+
+export interface RateLimiterLike {
+  check(key: string): Promise<RateLimitResult>;
+}
+
 interface Bucket {
   count: number;
   windowStart: number;
 }
 
 /**
- * Fixed-window in-memory rate limiter keyed by client IP. Good enough for a
- * single-instance deployment; a multi-instance deployment should back this
- * with Redis (INCR + EXPIRE) instead.
+ * In-memory fixed-window rate limiter keyed by client IP. Correct for a
+ * single long-running process (local dev, Docker, a VPS) — but each
+ * serverless instance on a platform like Vercel gets its own memory, so
+ * limits aren't actually shared. Use RedisRateLimiter there instead.
  */
-export class RateLimiter {
+export class MemoryRateLimiter implements RateLimiterLike {
   private buckets = new Map<string, Bucket>();
 
   constructor(
@@ -16,7 +29,7 @@ export class RateLimiter {
     private readonly windowMs: number
   ) {}
 
-  check(key: string): { allowed: boolean; remaining: number; retryAfterMs: number } {
+  async check(key: string): Promise<RateLimitResult> {
     const now = Date.now();
     const bucket = this.buckets.get(key);
 
@@ -31,6 +44,41 @@ export class RateLimiter {
 
     bucket.count += 1;
     return { allowed: true, remaining: this.max - bucket.count, retryAfterMs: 0 };
+  }
+}
+
+/**
+ * Redis-backed fixed-window rate limiter (via Upstash's REST API) shared
+ * across every serverless instance — required for the limit to mean
+ * anything once the app runs as multiple stateless functions.
+ */
+export class RedisRateLimiter implements RateLimiterLike {
+  private redis: Redis;
+
+  constructor(
+    url: string,
+    token: string,
+    private readonly max: number,
+    private readonly windowMs: number
+  ) {
+    this.redis = new Redis({ url, token });
+  }
+
+  async check(key: string): Promise<RateLimitResult> {
+    const bucketId = Math.floor(Date.now() / this.windowMs);
+    const redisKey = `sentinelscope:ratelimit:${key}:${bucketId}`;
+
+    const count = await this.redis.incr(redisKey);
+    if (count === 1) {
+      await this.redis.pexpire(redisKey, this.windowMs);
+    }
+
+    if (count > this.max) {
+      const ttl = await this.redis.pttl(redisKey);
+      return { allowed: false, remaining: 0, retryAfterMs: ttl > 0 ? ttl : this.windowMs };
+    }
+
+    return { allowed: true, remaining: this.max - count, retryAfterMs: 0 };
   }
 }
 

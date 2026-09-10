@@ -7,16 +7,20 @@ import { saveAnalysis } from "@/lib/store";
 import { getClientIp } from "@/lib/rateLimit";
 import { rateLimiter, resultCache } from "@/lib/analyzeShared";
 
-// The pipeline opens raw TLS/DNS sockets and reads the filesystem-backed
-// store, so it must run on the Node runtime rather than the Edge runtime.
+// The pipeline opens raw TLS/DNS sockets, so it must run on the Node
+// runtime rather than the Edge runtime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Vercel-specific: the pipeline's sequential network stages can exceed the
+// platform's default 10s function timeout; this raises the ceiling (ignored
+// as a no-op on non-Vercel Node hosts).
+export const maxDuration = 60;
 
 const bodySchema = z.object({ target: z.string().trim().min(1).max(2048) });
 
 export async function POST(request: NextRequest) {
   const clientIp = getClientIp(request.headers);
-  const rate = rateLimiter.check(clientIp);
+  const rate = await rateLimiter.check(clientIp);
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please wait before analyzing another target." },
@@ -45,7 +49,13 @@ export async function POST(request: NextRequest) {
   try {
     const result = await runAnalysis(parsed.data.target);
     resultCache.set(cacheKey, result);
-    await saveAnalysis(result);
+    try {
+      await saveAnalysis(result);
+    } catch (err) {
+      // The analysis itself succeeded — don't fail the request just because
+      // persistence (e.g. a misconfigured or rate-limited store) did.
+      console.error("Failed to persist analysis result:", err);
+    }
     return NextResponse.json(result, { status: 200, headers: { "X-Cache": "MISS" } });
   } catch (err) {
     if (err instanceof InvalidTargetError || err instanceof SsrfBlockedError) {

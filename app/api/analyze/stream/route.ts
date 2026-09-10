@@ -10,6 +10,9 @@ import type { PipelineStageResult } from "@/types/analysis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Vercel-specific: raises the function timeout ceiling past the platform's
+// default 10s (ignored as a no-op on non-Vercel Node hosts).
+export const maxDuration = 60;
 
 const bodySchema = z.object({ target: z.string().trim().min(1).max(2048) });
 
@@ -24,7 +27,7 @@ function sseEvent(event: Record<string, unknown>): Uint8Array {
  */
 export async function POST(request: NextRequest) {
   const clientIp = getClientIp(request.headers);
-  const rate = rateLimiter.check(clientIp);
+  const rate = await rateLimiter.check(clientIp);
   if (!rate.allowed) {
     return new Response(JSON.stringify({ error: "Rate limit exceeded. Please wait before analyzing another target." }), {
       status: 429,
@@ -70,7 +73,13 @@ export async function POST(request: NextRequest) {
           onStage: (stage: PipelineStageResult) => controller.enqueue(sseEvent({ type: "stage", stage })),
         });
         resultCache.set(cacheKey, result);
-        await saveAnalysis(result);
+        try {
+          await saveAnalysis(result);
+        } catch (err) {
+          // The analysis itself succeeded — don't turn persistence failure
+          // into an error event and discard a good result.
+          console.error("Failed to persist analysis result:", err);
+        }
         controller.enqueue(sseEvent({ type: "result", data: result }));
       } catch (err) {
         const message =

@@ -1,65 +1,25 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import type { AnalysisResult, HistoryEntry } from "@/types/analysis";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const STORE_FILE = path.join(DATA_DIR, "analyses.json");
-const MAX_ENTRIES = 200;
-
-// Serializes writes so concurrent requests can't interleave file writes and
-// corrupt the JSON store.
-let writeQueue: Promise<unknown> = Promise.resolve();
-
-async function ensureStore(): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  try {
-    await fs.access(STORE_FILE);
-  } catch {
-    await fs.writeFile(STORE_FILE, "[]", "utf-8");
-  }
-}
-
-async function readAll(): Promise<AnalysisResult[]> {
-  await ensureStore();
-  try {
-    const raw = await fs.readFile(STORE_FILE, "utf-8");
-    return JSON.parse(raw) as AnalysisResult[];
-  } catch {
-    return [];
-  }
-}
-
-async function writeAll(results: AnalysisResult[]): Promise<void> {
-  await fs.writeFile(STORE_FILE, JSON.stringify(results.slice(0, MAX_ENTRIES), null, 2), "utf-8");
-}
+import { createFileStore } from "@/lib/store/fileStore";
+import { createRedisStore } from "@/lib/store/redisStore";
+import type { AnalysisStore } from "@/lib/store/types";
 
 /**
- * Lightweight file-backed store for analysis history. Sufficient for a
- * single-instance deployment; swap for Postgres/SQLite if this needs to run
- * across multiple instances or survive container recreation without a
- * mounted volume.
+ * Picks the storage backend at module load: Redis (Upstash) when its REST
+ * credentials are configured — required on serverless platforms like Vercel
+ * — otherwise the file-backed store used for local dev, Docker, and VPS
+ * deployments. See lib/store/redisStore.ts and lib/store/fileStore.ts.
  */
-export async function saveAnalysis(result: AnalysisResult): Promise<void> {
-  writeQueue = writeQueue.then(async () => {
-    const all = await readAll();
-    all.unshift(result);
-    await writeAll(all);
-  });
-  await writeQueue;
+function createStore(): AnalysisStore {
+  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+
+  if (url && token) {
+    return createRedisStore(url, token);
+  }
+  return createFileStore();
 }
 
-export async function getAnalysis(id: string): Promise<AnalysisResult | null> {
-  const all = await readAll();
-  return all.find((r) => r.id === id) ?? null;
-}
+const store = createStore();
 
-export async function listHistory(limit = 25): Promise<HistoryEntry[]> {
-  const all = await readAll();
-  return all.slice(0, limit).map((r) => ({
-    id: r.id,
-    target: r.target,
-    timestamp: r.timestamp,
-    riskScore: r.riskScore,
-    riskLevel: r.riskLevel,
-  }));
-}
+export const saveAnalysis = store.saveAnalysis;
+export const getAnalysis = store.getAnalysis;
+export const listHistory = store.listHistory;

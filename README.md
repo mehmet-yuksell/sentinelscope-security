@@ -203,8 +203,45 @@ threat-intelligence as "Unavailable" rather than faking a result.
 | `RATE_LIMIT_MAX`          | No       | Requests per IP per window (default `10`) |
 | `RATE_LIMIT_WINDOW_MS`    | No       | Rate-limit window in ms (default `60000`) |
 | `ANALYSIS_CACHE_TTL_MS`   | No       | Result cache TTL in ms (default `300000`) |
+| `UPSTASH_REDIS_REST_URL`  | On serverless | Persistent store + shared rate limiting (see [Deployment](#deployment)) |
+| `UPSTASH_REDIS_REST_TOKEN`| On serverless | Paired with the URL above |
 
-## Docker
+## Deployment
+
+### Vercel
+
+SentinelScope's API routes open raw TLS/DNS sockets and run real network
+I/O per request, so they're deployed as Node.js Serverless Functions
+(`export const runtime = "nodejs"`), not Edge Functions — this works on
+Vercel without any extra configuration.
+
+The one thing serverless changes: **every request can land on a different,
+stateless instance**, and the local filesystem isn't shared or persistent.
+The default file-backed store (`./data/analyses.json`) only works for a
+single long-running process (local dev, Docker, a VPS). On Vercel, wire up
+a free Redis database instead so results survive across instances and the
+rate limiter is actually shared:
+
+1. Push this repo to your own GitHub account.
+2. Create a free Redis database at [console.upstash.com](https://console.upstash.com/redis)
+   (or add the "Upstash for Redis" integration from the Vercel Marketplace,
+   which provisions one and injects its env vars for you).
+3. Import the repo at [vercel.com/new](https://vercel.com/new). Vercel
+   auto-detects Next.js — no build settings to change.
+4. In the project's **Settings → Environment Variables**, add
+   `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (copied from the
+   Upstash dashboard's REST API section; skip this if you used the
+   Marketplace integration, which sets them automatically). Add
+   `VIRUSTOTAL_API_KEY` / `ABUSEIPDB_API_KEY` too if you have them.
+5. Deploy. You'll get a `https://<project>.vercel.app` link — that's the
+   one to share.
+
+Without the Redis env vars, the app still deploys and the analyze pipeline
+still runs correctly on every request; only `/analysis/[id]` links and the
+rate limiter become unreliable across instances (see `lib/store.ts` and
+`lib/rateLimit.ts`).
+
+### Docker / VPS
 
 ```bash
 docker compose up --build
@@ -245,6 +282,7 @@ sentinelscope/
 │   ├── security/ssrf.ts       # Reserved-address-space checks
 │   ├── net/safeRequest.ts     # SSRF-safe HTTP client with redirect pinning
 │   ├── validation/target.ts   # Target parsing/validation
+│   ├── store/                 # File store (local/Docker) + Redis store (serverless)
 │   ├── rateLimit.ts, cache.ts, store.ts, analyzeShared.ts
 ├── services/
 │   ├── dns/ tls/ http/ ip/ domain/ technology/ threat-intelligence/
@@ -266,8 +304,11 @@ sentinelscope/
   RDAP data; the Domain tab degrades gracefully when that happens.
 - **The `isDatacenter` flag is a heuristic** derived from the IP
   organization string, not an authoritative classification.
-- **History storage is a single JSON file**, sufficient for a
-  single-instance deployment/demo, not a production-scale datastore.
+- **History storage is a single JSON file by default** (local dev, Docker,
+  a VPS) — sufficient for a demo, not a production-scale datastore. On
+  serverless (Vercel), configure `UPSTASH_REDIS_REST_URL`/`_TOKEN` (see
+  [Deployment](#deployment)); without it, `/analysis/[id]` links and the
+  rate limiter aren't reliable across stateless instances.
 - **No authentication.** This is a public demo tool by design; add auth
   before deploying it as anything more than a personal/portfolio instance.
 
