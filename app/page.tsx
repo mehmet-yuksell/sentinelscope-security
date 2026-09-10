@@ -21,7 +21,7 @@ export default function HomePage() {
           <span className="rounded-full border border-base-600 bg-base-900/80 px-3.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-accent-400 backdrop-blur">
             Passive Security Intelligence
           </span>
-          <h1 className="text-glow text-5xl font-extrabold tracking-tight text-white sm:text-6xl">
+          <h1 className="text-glow text-[11vw] font-extrabold tracking-tight text-white sm:text-6xl">
             SENTINEL<span className="text-accent-400">SCOPE</span>
           </h1>
           <p className="text-xl font-medium text-base-200">Website &amp; Domain Threat Intelligence</p>

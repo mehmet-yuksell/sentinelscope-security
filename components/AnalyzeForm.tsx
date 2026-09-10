@@ -96,7 +96,7 @@ export function AnalyzeForm() {
           type="text"
           value={target}
           onChange={(e) => setTarget(e.target.value)}
-          placeholder="example.com, https://example.com, or 8.8.8.8"
+          placeholder="example.com or 8.8.8.8"
           aria-label="Target domain, URL, or IP address"
           disabled={phase === "running"}
           className="card-elevated w-full flex-1 rounded-xl border border-base-600 bg-base-900 px-5 py-4 font-mono text-sm text-base-100 placeholder:text-base-500 transition focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500 disabled:opacity-60"
