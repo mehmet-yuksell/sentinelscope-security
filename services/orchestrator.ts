@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { parseTarget } from "@/lib/validation/target";
+import { getRegistrableDomain } from "@/lib/dns/registrableDomain";
 import { resolveAndAssertPublic } from "@/lib/security/ssrf";
 import { analyzeDns } from "@/services/dns";
 import { analyzeIp } from "@/services/ip";
@@ -142,7 +143,8 @@ export async function runAnalysis(rawTarget: string, options: RunAnalysisOptions
     (await runStage(
       "domain",
       pipeline,
-      () => analyzeDomain(target.hostname),
+      // Registries only hold records for registered domains, not subdomains.
+      () => analyzeDomain(getRegistrableDomain(target.hostname)),
       isIpTarget && "Domain registration data does not apply to a literal IP target.",
       onStage
     )) ?? { status: "not_applicable" };

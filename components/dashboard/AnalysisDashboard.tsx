@@ -88,7 +88,7 @@ export function AnalysisDashboard({ result }: { result: AnalysisResult }) {
         {tab === "TLS" && <TlsPanel tls={result.tls} />}
         {tab === "HTTP" && <HttpPanel http={result.http} technologies={result.technologies} />}
         {tab === "IP" && <IpPanel ip={result.ip} />}
-        {tab === "Domain" && <DomainPanel domain={result.domain} />}
+        {tab === "Domain" && <DomainPanel domain={result.domain} hostname={result.hostname} />}
         {tab === "Threat Intelligence" && <ThreatIntelPanel threatIntelligence={result.threatIntelligence} />}
         {tab === "Findings" && <FindingsPanel findings={result.findings} />}
       </div>

@@ -2,7 +2,7 @@ import type { DomainIntelInfo, ProviderResult } from "@/types/analysis";
 import { ProviderStatusNotice } from "./ProviderStatusNotice";
 import { formatDate } from "@/utils/riskDisplay";
 
-export function DomainPanel({ domain }: { domain: ProviderResult<DomainIntelInfo> }) {
+export function DomainPanel({ domain, hostname }: { domain: ProviderResult<DomainIntelInfo>; hostname: string }) {
   if (domain.status !== "ok" || !domain.data) {
     return <ProviderStatusNotice status={domain.status} message={domain.message} />;
   }
@@ -11,6 +11,12 @@ export function DomainPanel({ domain }: { domain: ProviderResult<DomainIntelInfo
 
   return (
     <div className="space-y-6">
+      {d.domain !== hostname && (
+        <p className="text-sm text-base-400">
+          Registration data for <span className="font-mono text-base-200">{d.domain}</span>, the registered domain of{" "}
+          <span className="font-mono text-base-200">{hostname}</span>.
+        </p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-base-500">Registrar</p>
