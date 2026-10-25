@@ -36,6 +36,12 @@ beforeAll(async () => {
         res.writeHead(301, { location: "/page" });
         res.end();
         return;
+      case "/hang":
+        return; // accept the connection, never respond
+      case "/stall":
+        res.writeHead(200, { "content-type": "text/html" });
+        res.write("<html>"); // send headers and a first chunk, then go silent
+        return;
       default:
         res.writeHead(404);
         res.end();
@@ -75,5 +81,13 @@ describe("safeRequest", () => {
     expect(res.finalUrl).toBe(`${baseUrl}/page`);
     expect(res.redirectChain).toEqual([`${baseUrl}/redirect`]);
     expect(res.body).toBe(HTML);
+  });
+
+  it("rejects (instead of hanging) when the server never responds", async () => {
+    await expect(safeRequest(`${baseUrl}/hang`, { timeoutMs: 300 })).rejects.toThrow(/timed out/i);
+  });
+
+  it("rejects (instead of hanging) when the server stalls mid-body", async () => {
+    await expect(safeRequest(`${baseUrl}/stall`, { timeoutMs: 300 })).rejects.toThrow(/timed out/i);
   });
 });

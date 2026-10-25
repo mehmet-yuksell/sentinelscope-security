@@ -52,8 +52,22 @@ function performHop(
   options: Required<Pick<SafeRequestOptions, "method" | "timeoutMs" | "maxBodyBytes">> &
     Pick<SafeRequestOptions, "headers">
 ): Promise<HopResult> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolvePromise, rejectPromise) => {
     let settled = false;
+    // Every exit path goes through resolve()/reject() so the promise always
+    // settles exactly once and the deadline timer is always cleared.
+    const resolve = (result: HopResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      resolvePromise(result);
+    };
+    const reject = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      rejectPromise(err);
+    };
     const lib = url.protocol === "https:" ? https : http;
     const port = url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80;
 
@@ -86,18 +100,20 @@ function performHop(
           chunks.push(chunk);
           if (size > options.maxBodyBytes) {
             // Keep the first maxBodyBytes for analysis and stop reading the rest.
-            settled = true;
-            req.destroy();
             resolve({
               statusCode: res.statusCode ?? 0,
               headers: normalizeHeaders(res.headers),
               body: Buffer.concat(chunks).subarray(0, options.maxBodyBytes).toString("utf-8"),
             });
+            req.destroy();
           }
+        });
+        res.on("error", reject);
+        res.on("close", () => {
+          if (!res.complete) reject(new Error("Connection closed before the response completed"));
         });
         res.on("end", () => {
           if (settled) return;
-          settled = true;
           const headers = normalizeHeaders(res.headers);
           const statusCode = res.statusCode ?? 0;
           if ([301, 302, 303, 307, 308].includes(statusCode) && headers.location) {
@@ -109,16 +125,16 @@ function performHop(
       }
     );
 
-    req.on("timeout", () => {
-      if (settled) return;
-      settled = true;
-      req.destroy(new Error("Request timed out"));
-    });
-    req.on("error", (err) => {
-      if (settled) return;
-      settled = true;
-      reject(err);
-    });
+    const timeOut = () => {
+      reject(new Error(`Request timed out after ${options.timeoutMs}ms`));
+      req.destroy();
+    };
+    // `timeout` above only fires on socket inactivity; the deadline also caps
+    // a server that keeps the connection alive by trickling bytes.
+    const deadline = setTimeout(timeOut, options.timeoutMs);
+
+    req.on("timeout", timeOut);
+    req.on("error", reject);
     req.end();
   });
 }
