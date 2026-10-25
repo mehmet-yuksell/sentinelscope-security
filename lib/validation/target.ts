@@ -71,12 +71,18 @@ export function parseTarget(raw: string): ParsedTarget {
     }
     const hostname = url.hostname.toLowerCase();
     assertPublicHostname(hostname);
+    const port = url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80;
+    // Same rule safeRequest enforces per hop; checked here too because the TLS
+    // stage would otherwise open a socket to whatever port the URL names.
+    if (port !== 80 && port !== 443) {
+      throw new InvalidTargetError("Only ports 80 and 443 can be analyzed.");
+    }
     return {
       raw: input,
       kind: "url",
       hostname,
       protocol: url.protocol === "https:" ? "https" : "http",
-      port: url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80,
+      port,
       displayName: hostname,
     };
   }

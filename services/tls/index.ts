@@ -1,6 +1,6 @@
 import tls from "node:tls";
 import { isIP } from "node:net";
-import { resolveAndAssertPublic } from "@/lib/security/ssrf";
+import { assertSafePort, resolveAndAssertPublic } from "@/lib/security/ssrf";
 import type { TlsInfo, ProviderResult } from "@/types/analysis";
 
 const CONNECT_TIMEOUT_MS = 8000;
@@ -14,6 +14,7 @@ const CONNECT_TIMEOUT_MS = 8000;
 export async function analyzeTls(hostname: string, port = 443): Promise<ProviderResult<TlsInfo>> {
   let pinnedIp: string;
   try {
+    assertSafePort(port);
     const resolved = await resolveAndAssertPublic(hostname);
     pinnedIp = resolved.addresses[0]!;
   } catch (err) {

@@ -7,9 +7,14 @@ describe("parseTarget", () => {
     expect(target).toMatchObject({ kind: "domain", hostname: "example.com", protocol: "https", port: 443 });
   });
 
-  it("parses an https URL and preserves an explicit port", () => {
-    const target = parseTarget("https://example.com:8443/path");
-    expect(target).toMatchObject({ kind: "url", hostname: "example.com", protocol: "https", port: 8443 });
+  it("accepts an explicit standard port", () => {
+    expect(parseTarget("https://example.com:443/path")).toMatchObject({ kind: "url", hostname: "example.com", port: 443 });
+    expect(parseTarget("http://example.com:80")).toMatchObject({ kind: "url", protocol: "http", port: 80 });
+  });
+
+  it("rejects non-standard ports, so the TLS stage can't be used to probe arbitrary ports", () => {
+    expect(() => parseTarget("https://example.com:8443/path")).toThrow(InvalidTargetError);
+    expect(() => parseTarget("https://example.com:22")).toThrow(InvalidTargetError);
   });
 
   it("parses an http URL", () => {
