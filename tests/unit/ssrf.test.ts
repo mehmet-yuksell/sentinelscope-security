@@ -52,6 +52,20 @@ describe("isReservedIp", () => {
 
   it("flags IPv4-mapped IPv6 addresses that wrap a private IPv4", () => {
     expect(isReservedIp("::ffff:192.168.1.1")).toBe(true);
+    expect(isReservedIp("::ffff:7f00:1")).toBe(true); // hex form of ::ffff:127.0.0.1
+    expect(isReservedIp("0:0:0:0:0:ffff:127.0.0.1")).toBe(true); // uncompressed form
+  });
+
+  it("flags IPv6 transition ranges that can embed internal IPv4 space", () => {
+    expect(isReservedIp("::127.0.0.1")).toBe(true); // IPv4-compatible (deprecated)
+    expect(isReservedIp("2002:7f00:1::1")).toBe(true); // 6to4 wrapping 127.0.0.1
+    expect(isReservedIp("2002:a9fe:a9fe::1")).toBe(true); // 6to4 wrapping 169.254.169.254
+    expect(isReservedIp("2001:0:4136:e378:8000:63bf:3fff:fdd2")).toBe(true); // Teredo
+    expect(isReservedIp("64:ff9b::10.0.0.1")).toBe(true); // NAT64
+  });
+
+  it("flags the deprecated 6to4 relay anycast IPv4 range", () => {
+    expect(isReservedIp("192.88.99.1")).toBe(true);
   });
 
   it("does not flag a public IPv6 address", () => {

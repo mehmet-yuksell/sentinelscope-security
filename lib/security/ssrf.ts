@@ -41,6 +41,7 @@ const RESERVED_V4_CIDRS = [
   "172.16.0.0/12", // RFC1918
   "192.0.0.0/24", // IETF protocol assignments
   "192.0.2.0/24", // TEST-NET-1
+  "192.88.99.0/24", // deprecated 6to4 relay anycast
   "192.168.0.0/16", // RFC1918
   "198.18.0.0/15", // benchmarking
   "198.51.100.0/24", // TEST-NET-2
@@ -61,9 +62,13 @@ function isReservedV4(ip: string): boolean {
 
 function expandIpv6(ip: string): bigint {
   let addr = ip;
-  if (addr.startsWith("::ffff:") && addr.includes(".")) {
-    const v4 = addr.split(":").pop()!;
-    return BigInt(0xffff) << 32n | BigInt(ipv4ToInt(v4));
+  // A trailing dotted-quad (::ffff:1.2.3.4, ::1.2.3.4, 64:ff9b::1.2.3.4,
+  // 0:0:0:0:0:ffff:1.2.3.4) is the last 32 bits; rewrite it as two hex groups.
+  const lastColon = addr.lastIndexOf(":");
+  const trailing = addr.slice(lastColon + 1);
+  if (trailing.includes(".")) {
+    const v4 = ipv4ToInt(trailing);
+    addr = `${addr.slice(0, lastColon + 1)}${(v4 >>> 16).toString(16)}:${(v4 & 0xffff).toString(16)}`;
   }
   const [head, tail] = addr.split("::");
   const headParts = head ? head.split(":").filter(Boolean) : [];
@@ -90,6 +95,11 @@ const RESERVED_V6_PREFIXES: [string, number][] = [
   ["2001:db8::", 32], // documentation range
   ["64:ff9b::", 96], // NAT64 (can embed internal IPv4 space)
   ["100::", 64], // discard-only range
+  // Transition mechanisms that embed an IPv4 address (possibly internal) in
+  // the IPv6 address. All are deprecated or unused by real public sites.
+  ["::", 96], // IPv4-compatible
+  ["2002::", 16], // 6to4
+  ["2001::", 32], // Teredo
 ];
 
 function isReservedV6(ip: string): boolean {
