@@ -1,184 +1,220 @@
 # SentinelScope
 
-**Website & Domain Threat Intelligence Platform**
+**One passive scan of a website, domain, or IP — DNS, TLS, HTTP headers, domain and IP intelligence, and threat reputation — turned into a transparent, evidence-backed risk score.**
 
-SentinelScope analyzes the public security posture of a website, domain, or
-IP address — DNS, TLS, HTTP security headers, IP/domain intelligence, and
-threat-intelligence reputation — and turns it into a single risk score with
-concrete, evidence-backed findings.
+[![CI](https://github.com/mehmet-yuksell/sentinelscope-security/actions/workflows/ci.yml/badge.svg)](https://github.com/mehmet-yuksell/sentinelscope-security/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/github/package-json/v/mehmet-yuksell/sentinelscope-security)](CHANGELOG.md)
+[![Live demo](https://img.shields.io/badge/demo-sentinelscope--nu.vercel.app-2dd4bf)](https://sentinelscope-nu.vercel.app)
 
-It is a passive reconnaissance tool, not an attack tool. See
-[Security](#security) and [Responsible Use](#responsible-use).
+**Live demo:** [sentinelscope-nu.vercel.app](https://sentinelscope-nu.vercel.app)
+
+SentinelScope is a passive reconnaissance tool, not an attack tool: it
+fetches the target's front page once (following redirects, falling back from
+HTTPS to HTTP if needed), opens one TLS handshake, and queries public DNS,
+RDAP, and reputation sources. See [Security](#security) and
+[Responsible Use](#responsible-use).
 
 ---
 
-## Overview
+## Highlights
 
-Paste in `example.com`, `https://example.com`, or an IP address, and
-SentinelScope runs a real backend pipeline against it: resolving DNS
-records, opening an actual TLS handshake, fetching and grading HTTP
-security headers, looking up IP/ASN and domain registration data, querying
-threat-intelligence providers (when configured), and finally computing a
-weighted risk score from everything it found. Every screen in the dashboard
-reflects a real lookup — a provider with nothing to report says so
-explicitly rather than showing a fabricated value.
+- **Real data only.** Every value on screen comes from a real lookup. A
+  provider with nothing to report is shown as *Unavailable* — never a
+  plausible-looking placeholder. If no factor can be measured at all, the
+  result is *Insufficient Data*, not a score.
+- **Explainable risk score.** A weighted average of seven independently
+  scored factors; factors without data are excluded rather than counted as
+  safe. Every finding carries severity, evidence, and a concrete fix.
+- **Live pipeline.** Each stage's real completion is streamed to the browser
+  over Server-Sent Events — the progress UI is not a timer.
+- **SSRF-hardened by design.** Every connection to a user-supplied target,
+  including each redirect hop, is resolved, checked against private and
+  reserved address space (IPv4, IPv6, and IPv6 transition ranges), and pinned
+  to the validated IP.
+- **Deploys anywhere.** Vercel (with Upstash Redis), Docker, or a plain Node
+  server.
 
 ## Features
 
-- **DNS Intelligence** — A, AAAA, MX, NS, TXT, CNAME, SOA, CAA, and a
-  targeted DMARC lookup
-- **TLS Analysis** — real TLS handshake: protocol version, issuer,
-  validity window, SANs, trust/authorization status
-- **HTTP Security Headers** — HSTS, CSP, X-Content-Type-Options,
-  X-Frame-Options, Referrer-Policy, Permissions-Policy, each graded
-  pass/warning/missing
-- **IP Intelligence** — ASN, organization/ISP, geolocation, reverse DNS
-- **Domain Intelligence** — registrar, registration/expiry dates,
-  nameservers, domain age via RDAP
-- **Threat Intelligence** — VirusTotal and AbuseIPDB reputation (when API
-  keys are configured)
-- **Technology Detection** — passive fingerprinting of web server, CDN,
-  framework, CMS, and analytics from headers/HTML markers
-- **Risk Scoring** — a transparent, weighted-factor risk engine (see
-  [Risk Methodology](#risk-methodology))
-- **Security Findings** — each finding carries severity, evidence, and a
-  concrete recommendation
-- **Report Generation** — a print-friendly report per analysis
-- **Analysis History** — each visitor's own recent scans, kept in their
-  browser only (never a server-side feed other visitors can see)
+| Area | What is checked |
+| --- | --- |
+| DNS | A, AAAA, MX, NS, TXT, CNAME, SOA, CAA (inherited from parent domains per RFC 8659), DMARC, SPF |
+| TLS | Real handshake: negotiated protocol, issuer, validity window and days remaining, SANs, trust status, self-signed detection |
+| HTTP headers | HSTS, CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy — each graded pass / warning / missing |
+| Configuration | Server/X-Powered-By version disclosure, plain-HTTP serving without a redirect to HTTPS |
+| IP intelligence | ASN, organization, geolocation, reverse DNS, datacenter heuristic |
+| Domain intelligence | Registrar, registration/expiry dates, domain age, status flags via RDAP |
+| Threat intelligence | VirusTotal and AbuseIPDB reputation (optional API keys) |
+| Technology | Passive fingerprinting of web server, CDN, hosting platform, framework, CMS, and analytics from headers and HTML markers |
+| Reporting | Shareable per-analysis link and a print-friendly report |
+| History | Each visitor's recent scans, stored only in their own browser |
+
+## Why SentinelScope?
+
+There are excellent single-purpose tools, and SentinelScope does not replace
+any of them in depth. What it offers is a single, combined first look.
+
+| | SentinelScope | Qualys SSL Labs | SecurityHeaders.com | Shodan |
+| --- | --- | --- | --- | --- |
+| Primary focus | Combined posture overview | TLS server configuration | HTTP response headers | Internet-wide scan data |
+| TLS | One handshake: negotiated version and certificate | Full protocol and cipher-suite audit | — | Certificates seen in its own scans |
+| HTTP security headers | Graded | — | Graded, with policy guidance | — |
+| DNS & email auth | CAA, SPF, DMARC, NS | CAA | — | — |
+| Domain registration & age | Yes (RDAP) | — | — | — |
+| Reputation | VirusTotal, AbuseIPDB (with keys) | — | — | — |
+| Open ports & services | No — by design | — | — | Yes |
+| Scoring | Weighted, explainable risk score | Letter grade | Letter grade | — |
+| Delivery | Open source (MIT), self-hostable | Hosted service | Hosted service | Hosted service |
+
+"—" means it is not that tool's focus.
+
+**Use something else when** you need a full TLS configuration audit (SSL
+Labs), a dedicated header review with policy guidance (SecurityHeaders.com),
+or exposure data for open ports and services (Shodan). SentinelScope is for
+the moment before that — a quick, explainable answer to "what does this
+target look like from the outside?".
 
 ## Architecture
 
-```text
-                     Browser (Next.js App Router UI)
-                                 |
-                       POST /api/analyze/stream (SSE)
-                                 |
-                     Rate Limiter  +  Result Cache
-                                 |
-                       Analysis Orchestrator
-                                 |
-   +---------+---------+---------+---------+---------+---------+
-   |  DNS    |   IP    |  TLS    |  HTTP   | Domain  |  Threat  |
-   | Service | Service | Service | Service | Service |  Intel   |
-   +---------+---------+---------+---------+---------+---------+
-                                 |
-                       Technology Detection
-                                 |
-                          Risk Engine
-                                 |
-                     Normalized AnalysisResult
-                                 |
-                  Store, keyed by id (file or Redis)
+```mermaid
+flowchart TB
+    browser["Browser · Next.js App Router UI"]
+
+    subgraph api["Route handlers · Node.js runtime"]
+        direction TB
+        routes["POST /api/analyze/stream (SSE)<br/>POST /api/analyze (JSON)"]
+        limiter["Rate limiter<br/>in-memory or Redis"]
+        cache["Result cache<br/>in-memory TTL"]
+        routes --> limiter --> cache
+    end
+
+    subgraph pipeline["Analysis orchestrator · stages run in order"]
+        direction TB
+        validate["1 · Target validation"]
+        dns["2 · DNS records"]
+        ip["3 · IP intelligence"]
+        tls["4 · TLS handshake"]
+        http["5 · HTTP fetch + header grading"]
+        tech["6 · Technology detection"]
+        domain["7 · Domain registration (RDAP)"]
+        ti["8 · Threat intelligence"]
+        risk["9 · Risk engine"]
+        validate --> dns --> ip --> tls --> http --> tech --> domain --> ti --> risk
+    end
+
+    guard{{"SSRF guard<br/>resolve · reject private/reserved · pin IP"}}
+    target[("Target host")]
+    providers[("ipapi.co · rdap.org<br/>VirusTotal · AbuseIPDB")]
+    store[("Result store by id<br/>JSON file or Redis")]
+
+    browser --> routes
+    cache -- miss --> validate
+    tls --> guard
+    http --> guard
+    guard --> target
+    ip --> providers
+    domain --> providers
+    ti --> providers
+    risk --> store
+    risk -.->|stage events + result| browser
 ```
 
-Each result is stored only under its own unguessable id, for direct
-`/analysis/[id]` links — there is no server-side "list everything"
-endpoint. A visitor's "recent analyses" list is local to their browser
-(see [Security](#security)).
-
-Every outbound connection to a **user-supplied** target — the initial
-request and every HTTP redirect hop — is routed through
-`lib/net/safeRequest.ts`, which resolves and validates the destination
-against private/reserved address space before connecting (see
-[Security](#security)). Threat-intelligence and IP-geolocation calls go to
-fixed, trusted third-party APIs and are not subject to that check.
+- **Only user-supplied targets go through the SSRF guard**
+  (`lib/security/ssrf.ts`, `lib/net/safeRequest.ts`). Calls to the fixed,
+  trusted provider APIs do not.
+- **Results are stored only by unguessable id** for shareable
+  `/analysis/[id]` links. There is deliberately no endpoint that lists past
+  analyses; the "recent analyses" list lives in each visitor's
+  `localStorage`.
+- **Every stage returns a `ProviderResult<T>`** with an explicit status
+  (`ok`, `unavailable`, `error`, `not_applicable`), so the UI never has to
+  guess whether missing data means "safe" or "unknown".
 
 ## Tech Stack
 
-| Layer      | Choice                                                |
-| ---------- | ------------------------------------------------------ |
-| Framework  | Next.js 16 (App Router), TypeScript (strict)           |
-| UI         | Tailwind CSS, Recharts                                 |
-| Validation | Zod                                                     |
-| Backend    | Next.js Route Handlers (Node runtime), Node core `dns`/`tls`/`http`/`https` |
-| Storage    | Lightweight JSON file store (`lib/store.ts`) — swappable for Postgres/SQLite |
-| Testing    | Vitest                                                  |
-| Container  | Docker (multi-stage, standalone output)                |
-| CI         | GitHub Actions                                          |
+| Layer | Choice |
+| --- | --- |
+| Framework | Next.js 16 (App Router), React 19, TypeScript (strict) |
+| UI | Tailwind CSS, Recharts |
+| Validation | Zod |
+| Backend | Next.js Route Handlers on the Node.js runtime; Node core `dns`, `tls`, `http`, `https` |
+| Storage | JSON file store (local, Docker, VPS) or Upstash Redis (serverless) |
+| Testing | Vitest |
+| Delivery | Docker (multi-stage, standalone output), GitHub Actions, Dependabot |
 
-## Screenshots
+## Quick Start
 
-Add screenshots of the landing page and the analysis dashboard here
-(`docs/screenshots/`) before publishing — the Overview tab (risk gauge +
-Security DNA radar) and the Findings tab make the strongest first
-impression.
+Requires Node.js 22.12 or newer.
+
+```bash
+git clone https://github.com/mehmet-yuksell/sentinelscope-security.git
+cd sentinelscope-security
+npm install
+cp .env.example .env
+npm run dev
+```
+
+Open http://localhost:3000. No API keys are needed to run the full DNS,
+TLS, HTTP, IP, and domain pipeline.
+
+### Environment Variables
+
+All variables are optional. Without threat-intelligence keys, those panels
+are clearly labeled *Unavailable* and excluded from the score.
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `VIRUSTOTAL_API_KEY` | Domain/IP reputation via VirusTotal | — |
+| `ABUSEIPDB_API_KEY` | IP abuse reputation via AbuseIPDB | — |
+| `URLSCAN_API_KEY` | Reserved for a future urlscan.io integration (not used yet) | — |
+| `RATE_LIMIT_MAX` | Analyze requests per client IP per window | `10` |
+| `RATE_LIMIT_WINDOW_MS` | Rate-limit window in ms | `60000` |
+| `ANALYSIS_CACHE_TTL_MS` | How long an identical target is served from cache | `300000` |
+| `UPSTASH_REDIS_REST_URL` | Persistent store and shared rate limiting — needed on serverless | — |
+| `UPSTASH_REDIS_REST_TOKEN` | Paired with the URL above | — |
+
+Vercel's Upstash integration injects `KV_REST_API_URL` /
+`KV_REST_API_TOKEN` instead; both naming schemes are supported.
 
 ## How It Works
 
-1. **Target Validation** — the input is parsed as a domain, URL, or IP and
-   checked against reserved/private address space (`lib/validation/target.ts`).
-2. **DNS Intelligence** — standard record types are resolved in parallel,
-   tolerating missing record types (`services/dns`).
-3. **IP Intelligence** — the resolved IP is looked up for ASN/org/geo via a
-   free keyless API, plus a real reverse-DNS lookup (`services/ip`).
-4. **TLS Analysis** — a real TLS socket is opened against the resolved,
-   validated IP; the certificate chain is inspected (`services/tls`).
-5. **HTTP Analysis** — a single SSRF-safe fetch retrieves headers and body;
+1. **Target validation** — the input is parsed as a domain, URL, or IP;
+   only `http`/`https`, ports 80/443, and public addresses are accepted
+   (`lib/validation/target.ts`).
+2. **DNS** — standard record types are resolved in parallel; a missing type
+   is an empty result, not an error (`services/dns`).
+3. **IP intelligence** — ASN, organization, and geolocation from a keyless
+   API, plus a real reverse-DNS lookup (`services/ip`).
+4. **TLS** — a real TLS socket to the validated, pinned IP; the certificate
+   is inspected (`services/tls`).
+5. **HTTP** — one SSRF-safe fetch (HTTPS first) retrieves headers and body;
    headers are graded and the body is reused for technology detection
    (`services/http`, `services/technology`).
-6. **Domain Intelligence** — registration data is fetched via RDAP
-   (`services/domain`).
-7. **Threat Intelligence** — VirusTotal and AbuseIPDB are queried in
-   parallel if their API keys are configured (`services/threat-intelligence`).
-8. **Risk Engine** — each factor is independently scored 0–100; factors
-   with no usable data are excluded from the weighted average rather than
-   defaulting to "safe" (`services/risk-engine`).
-
-Each stage's real completion is streamed to the browser over
-Server-Sent Events (`/api/analyze/stream`) as it finishes, so the pipeline
-UI reflects actual backend timing — not a fake loading animation.
-
-## Security
-
-- **SSRF protection.** `lib/security/ssrf.ts` blocks loopback, RFC1918
-  private ranges, link-local (including the `169.254.169.254` cloud
-  metadata address), carrier-grade NAT, multicast, and their IPv6
-  equivalents. `lib/net/safeRequest.ts` re-validates **every redirect hop**
-  and pins each connection to its validated IP (not just the hostname) to
-  close the DNS-rebinding time-of-check/time-of-use gap.
-- **Input validation.** Only `http`/`https` schemes and ports 80/443 are
-  permitted; URLs with embedded credentials are rejected.
-- **Rate limiting.** `lib/rateLimit.ts` limits analyze requests per client
-  IP (`RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS`).
-- **Timeouts & response caps.** Every outbound socket has a connect/read
-  timeout, a capped redirect count, and a maximum response size.
-- **Caching.** Identical targets are served from an in-memory TTL cache
-  (`ANALYSIS_CACHE_TTL_MS`) to reduce load on both this server and upstream
-  providers.
-- **Secrets never reach the client.** Third-party API keys live in
-  server-side environment variables and are read only inside
-  `services/threat-intelligence`.
-- **No cross-visitor history leak.** A direct `/analysis/[id]` link is
-  intentionally shareable (its id is an unguessable UUID), but there is no
-  server endpoint that lists every analysis ever run. Each visitor's
-  "recent analyses" list is written to and read from their own browser's
-  `localStorage` only (`utils/clientHistory.ts`) — the server never learns
-  what any other visitor has queried.
+6. **Domain** — registration data via RDAP (`services/domain`).
+7. **Threat intelligence** — VirusTotal and AbuseIPDB in parallel, if
+   configured (`services/threat-intelligence`).
+8. **Risk engine** — each factor is scored 0–100 independently and combined
+   into a weighted average (`services/risk-engine`).
 
 ## Risk Methodology
 
-The risk score is a weighted average of independently scored 0–100 risk
-factors:
+| Factor | Weight |
+| --- | --- |
+| TLS Security | 22% |
+| HTTP Security Headers | 20% |
+| Threat Intelligence | 14% |
+| DNS Configuration | 12% |
+| Domain Reputation | 12% |
+| IP Reputation | 12% |
+| Configuration Findings | 8% |
 
-| Factor                  | Weight |
-| ------------------------ | ------ |
-| TLS Security             | 22%    |
-| HTTP Security Headers    | 20%    |
-| Threat Intelligence      | 14%    |
-| DNS Configuration        | 12%    |
-| Domain Reputation        | 12%    |
-| IP Reputation            | 12%    |
-| Configuration Findings   | 8%     |
-
-A factor is **excluded from the average** — not scored as safe or risky —
-when its underlying data is unavailable (e.g. no `VIRUSTOTAL_API_KEY`
-configured, or a failed lookup). This means the score always reflects only
-the evidence actually gathered.
+A factor whose data is unavailable — no API key, a failed lookup — is
+**excluded** and the remaining weights are renormalized, so the score only
+reflects evidence that was actually gathered. If no factor has data, the
+result is reported as *Insufficient Data* with no score or grade.
 
 ```text
-Risk Score = weighted average of applicable factor scores
-
 0–19   Very Low
 20–39  Low
 40–59  Moderate
@@ -186,72 +222,58 @@ Risk Score = weighted average of applicable factor scores
 80–100 Critical
 ```
 
-See `services/risk-engine/index.ts` for the full scoring logic and the
-exact evidence that drives each factor.
+The exact rules behind each factor and finding are in
+`services/risk-engine/index.ts`, and summarized on the in-app
+[Methodology](https://sentinelscope-nu.vercel.app/methodology) page.
 
-## Installation
+## Security
 
-```bash
-git clone https://github.com/mehmetyuksell/sentinelscope.git
-cd sentinelscope
-npm install
-cp .env.example .env
-npm run dev
-```
+- **SSRF protection.** Loopback, RFC 1918, link-local (including the
+  `169.254.169.254` cloud metadata address), carrier-grade NAT, multicast,
+  documentation and reserved ranges are blocked, together with their IPv6
+  equivalents and IPv6 transition forms that can embed an IPv4 address
+  (IPv4-mapped, IPv4-compatible, NAT64, 6to4, Teredo). Every redirect hop is
+  re-validated and each connection is pinned to its validated IP, closing
+  the DNS-rebinding time-of-check/time-of-use gap.
+- **Input validation.** Only `http`/`https`, ports 80/443, and URLs without
+  embedded credentials are accepted.
+- **Rate limiting** per client IP, shared across instances when Redis is
+  configured (`lib/rateLimit.ts`).
+- **Timeouts and caps.** Each outbound HTTP hop has a hard deadline (8 s by
+  default), at most 5 redirects, and a 2 MB response cap; TLS, RDAP, IP and
+  reputation lookups have their own timeouts.
+- **Secrets stay on the server.** Provider API keys are read only inside
+  `services/threat-intelligence` and never reach the client.
+- **No cross-visitor history.** Analyses are retrievable only by their
+  unguessable UUID; there is no "list everything" endpoint.
+- **Dependency hygiene.** Dependabot opens weekly update PRs, and CI fails
+  on high or critical advisories in runtime dependencies.
 
-Open http://localhost:3000.
-
-### Environment Variables
-
-All threat-intelligence keys are optional. Without them, SentinelScope
-still runs the full DNS/TLS/HTTP/IP/domain pipeline and clearly labels
-threat-intelligence as "Unavailable" rather than faking a result.
-
-| Variable                 | Required | Purpose                                  |
-| ------------------------- | -------- | ----------------------------------------- |
-| `VIRUSTOTAL_API_KEY`      | No       | Domain/IP reputation via VirusTotal       |
-| `ABUSEIPDB_API_KEY`       | No       | IP abuse reputation via AbuseIPDB         |
-| `URLSCAN_API_KEY`         | No       | Reserved for future URL-scan integration  |
-| `RATE_LIMIT_MAX`          | No       | Requests per IP per window (default `10`) |
-| `RATE_LIMIT_WINDOW_MS`    | No       | Rate-limit window in ms (default `60000`) |
-| `ANALYSIS_CACHE_TTL_MS`   | No       | Result cache TTL in ms (default `300000`) |
-| `UPSTASH_REDIS_REST_URL`  | On serverless | Persistent store + shared rate limiting (see [Deployment](#deployment)) |
-| `UPSTASH_REDIS_REST_TOKEN`| On serverless | Paired with the URL above |
+Found a vulnerability? Please follow [SECURITY.md](SECURITY.md) rather than
+opening a public issue.
 
 ## Deployment
 
 ### Vercel
 
-SentinelScope's API routes open raw TLS/DNS sockets and run real network
-I/O per request, so they're deployed as Node.js Serverless Functions
-(`export const runtime = "nodejs"`), not Edge Functions — this works on
-Vercel without any extra configuration.
+The API routes open raw TLS/DNS sockets, so they run as Node.js functions
+(`export const runtime = "nodejs"`), which Vercel supports without extra
+configuration.
 
-The one thing serverless changes: **every request can land on a different,
-stateless instance**, and the local filesystem isn't shared or persistent.
-The default file-backed store (`./data/analyses.json`) only works for a
-single long-running process (local dev, Docker, a VPS). On Vercel, wire up
-a free Redis database instead so results survive across instances and the
-rate limiter is actually shared:
+Serverless instances are stateless, so the default JSON file store and the
+in-memory rate limiter are not shared between requests. Add Redis:
 
-1. Push this repo to your own GitHub account.
-2. Create a free Redis database at [console.upstash.com](https://console.upstash.com/redis)
-   (or add the "Upstash for Redis" integration from the Vercel Marketplace,
-   which provisions one and injects its env vars for you).
-3. Import the repo at [vercel.com/new](https://vercel.com/new). Vercel
-   auto-detects Next.js — no build settings to change.
-4. In the project's **Settings → Environment Variables**, add
-   `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (copied from the
-   Upstash dashboard's REST API section; skip this if you used the
-   Marketplace integration, which sets them automatically). Add
-   `VIRUSTOTAL_API_KEY` / `ABUSEIPDB_API_KEY` too if you have them.
-5. Deploy. You'll get a `https://<project>.vercel.app` link — that's the
-   one to share.
+1. Create a free database at [console.upstash.com](https://console.upstash.com/redis),
+   or add the Upstash for Redis integration from the Vercel Marketplace
+   (it sets the variables for you).
+2. Import the repository at [vercel.com/new](https://vercel.com/new).
+3. Under **Settings → Environment Variables**, add
+   `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`, plus any
+   threat-intelligence keys.
+4. Deploy.
 
-Without the Redis env vars, the app still deploys and the analyze pipeline
-still runs correctly on every request; only `/analysis/[id]` links and the
-rate limiter become unreliable across instances (see `lib/store.ts` and
-`lib/rateLimit.ts`).
+Without Redis the pipeline still works on every request; only
+`/analysis/[id]` links and rate limiting become unreliable across instances.
 
 ### Docker / VPS
 
@@ -259,90 +281,96 @@ rate limiter become unreliable across instances (see `lib/store.ts` and
 docker compose up --build
 ```
 
-This builds the multi-stage image (Next.js standalone output) and serves
-the app on http://localhost:3000, persisting analysis history to a named
-volume. Pass API keys via a `.env` file in the project root — Compose
-reads it automatically — or your shell environment.
+Builds the multi-stage image (Next.js standalone output), serves the app on
+http://localhost:3000, and persists results to a named volume. API keys are
+read from a `.env` file in the project root or from the shell environment.
 
 ## Testing
 
 ```bash
+npm run lint
+npm run typecheck
 npm test
+npm run build
 ```
 
-- **Unit tests** — target/URL validation and SSRF address-range checks
-  (`tests/unit/target.test.ts`, `tests/unit/ssrf.test.ts`), HTTP
-  security-header grading (`tests/unit/http-headers.test.ts`), and risk
-  engine scoring/finding logic (`tests/unit/risk-engine.test.ts`).
-- **Integration tests** — the `/api/analyze` route handler, covering
-  validation errors, the success path, cache-hit behavior, error mapping,
-  and rate limiting (`tests/integration/analyze-route.test.ts`), with the
-  orchestrator mocked so tests don't depend on live network access.
+CI runs all four on every push to `main` and every pull request, plus a
+production dependency audit.
+
+- **Unit tests** — target validation and port rules, SSRF address ranges
+  (IPv4, IPv6, transition forms), HTTP header grading, CAA inheritance, the
+  TLS port guard, and risk-engine scoring and findings
+  (`tests/unit/`).
+- **Integration tests** — the SSRF-safe HTTP client against a local server
+  (body capture, size cap, redirects, timeouts and stalled responses), and
+  the `/api/analyze` route handler (validation, success, caching, error
+  mapping, rate limiting) with the pipeline mocked (`tests/integration/`).
+
+No test depends on live network access.
 
 ## Project Structure
 
 ```text
-sentinelscope/
-├── app/                      # Next.js App Router pages & API routes
-│   ├── api/
-│   │   ├── analyze/          # POST /api/analyze (JSON) and /stream (SSE)
-│   │   └── analysis/[id]/    # GET a single stored analysis by id
-│   └── analysis/[id]/        # Dashboard + print-friendly report pages
-├── components/                # UI components (dashboard/, form, pipeline)
-├── utils/clientHistory.ts     # Per-browser "recent analyses" (localStorage only)
+sentinelscope-security/
+├── app/                        # App Router pages and API routes
+│   ├── api/analyze/            # POST /api/analyze (JSON) and /stream (SSE)
+│   ├── api/analysis/[id]/      # GET a stored analysis by id
+│   └── analysis/[id]/          # Dashboard and print-friendly report
+├── components/                 # UI (dashboard/, form, pipeline progress)
 ├── lib/
-│   ├── security/ssrf.ts       # Reserved-address-space checks
-│   ├── net/safeRequest.ts     # SSRF-safe HTTP client with redirect pinning
-│   ├── validation/target.ts   # Target parsing/validation
-│   ├── store/                 # File store (local/Docker) + Redis store (serverless), by-id only
-│   ├── rateLimit.ts, cache.ts, store.ts, analyzeShared.ts
-├── services/
-│   ├── dns/ tls/ http/ ip/ domain/ technology/ threat-intelligence/
-│   ├── risk-engine/            # Weighted scoring + finding generation
-│   └── orchestrator.ts         # Ties every stage together
-├── types/analysis.ts           # The normalized AnalysisResult data model
+│   ├── security/ssrf.ts        # Reserved address space checks
+│   ├── net/safeRequest.ts      # SSRF-safe HTTP client with IP pinning
+│   ├── validation/target.ts    # Target parsing and validation
+│   ├── store/                  # File store and Redis store (by id only)
+│   └── rateLimit.ts, cache.ts, store.ts, analyzeShared.ts
+├── services/                   # dns, ip, tls, http, technology, domain,
+│   │                           # threat-intelligence, risk-engine
+│   └── orchestrator.ts         # Runs the pipeline
+├── types/analysis.ts           # The normalized AnalysisResult model
+├── utils/                      # Display helpers, browser-only history
 ├── tests/unit/, tests/integration/
-├── Dockerfile, docker-compose.yml
-└── .github/workflows/ci.yml
+└── Dockerfile, docker-compose.yml, .github/
 ```
 
 ## Limitations
 
-- **Threat intelligence requires API keys.** Without `VIRUSTOTAL_API_KEY`
-  / `ABUSEIPDB_API_KEY`, those panels report "Unavailable" — this is
-  intentional (see [Real Data Priority](#real-data-priority) below), not a
-  bug.
-- **RDAP/WHOIS coverage varies by TLD.** Some registries don't expose full
-  RDAP data; the Domain tab degrades gracefully when that happens.
-- **The `isDatacenter` flag is a heuristic** derived from the IP
-  organization string, not an authoritative classification.
-- **Individual results are stored server-side by id** — a JSON file by
-  default (local dev, Docker, a VPS), Redis on serverless (see
-  [Deployment](#deployment); without it, `/analysis/[id]` links and the
-  rate limiter aren't reliable across Vercel's stateless instances). There
-  is no server-side "list everything" endpoint — the aggregate "recent
-  analyses" list is per-browser `localStorage` only, by design.
-- **No authentication.** This is a public demo tool by design; add auth
-  before deploying it as anything more than a personal/portfolio instance.
+- **TLS analysis is a single handshake.** It reports the negotiated protocol
+  and certificate, not the full set of protocols and cipher suites a server
+  accepts.
+- **Threat intelligence needs API keys.** Without them those factors are
+  *Unavailable* and excluded from the score — intentionally.
+- **Domain data is looked up for the exact hostname.** RDAP registries
+  usually have no record for subdomains such as `www.example.com`, so the
+  Domain tab reports *Unavailable* for them; analyze the registered domain
+  to get registration data.
+- **RDAP coverage varies by TLD**, and the keyless IP-intelligence provider
+  may rate-limit; both degrade to *Unavailable*.
+- **The datacenter flag is a heuristic** based on the organization name.
+- **No authentication.** This is a public demo by design; add
+  authentication before running it as anything more than a personal
+  instance.
 
 ### Real Data Priority
 
-1. Real API / real local analysis
-2. A clearly labeled "Unavailable" or "Not Applicable" state
+1. Real API or real local analysis
+2. A clearly labeled *Unavailable* or *Not Applicable* state
 3. Never: a fabricated score, reputation verdict, or vulnerability
 
 ## Responsible Use
 
-SentinelScope performs **passive, non-destructive** reconnaissance only:
-DNS resolution, TLS handshakes, HTTP header inspection, and public
-reputation lookups. It never attempts exploitation, credential attacks,
-brute forcing, or denial of service, and outbound requests to
-user-supplied targets are restricted to public address space (see
-[Security](#security)). Use it only against targets you are authorized to
-assess.
+SentinelScope performs **passive, non-destructive** checks only: DNS
+resolution, one TLS handshake, a single front-page fetch (following
+redirects), and public reputation lookups. It never attempts exploitation, credential
+attacks, brute forcing, port scanning, or denial of service. Use it only
+against targets you are authorized to assess.
+
+## Contributing
+
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Author
 
-**Mehmet Yüksel**
+**Mehmet Yüksel** · [github.com/mehmet-yuksell](https://github.com/mehmet-yuksell)
 
-GitHub: [github.com/mehmetyuksell](https://github.com/mehmetyuksell)
+Licensed under the [MIT License](LICENSE).
