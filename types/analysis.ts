@@ -46,6 +46,8 @@ export interface DnsRecordSet {
     minttl: number;
   } | null;
   caa: { critical: number; iodef?: string; issue?: string; issuewild?: string }[];
+  /** Set when `caa` came from a parent domain (RFC 8659 tree climbing) rather than the hostname itself. */
+  caaInheritedFrom?: string;
   dmarcRecord: string | null;
 }
 

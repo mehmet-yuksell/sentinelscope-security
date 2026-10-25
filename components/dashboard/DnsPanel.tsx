@@ -32,7 +32,10 @@ export function DnsPanel({ dns }: { dns: ProviderResult<DnsRecordSet> }) {
       <RecordGroup title="NS" values={d.ns} />
       <RecordGroup title="MX" values={d.mx.map((m) => `${m.priority} ${m.exchange}`)} />
       <RecordGroup title="TXT" values={d.txt.map((chunks) => chunks.join(""))} />
-      <RecordGroup title="CAA" values={d.caa.map((c) => `flags=${c.critical} ${c.issue ?? c.issuewild ?? c.iodef ?? ""}`)} />
+      <RecordGroup
+        title={d.caaInheritedFrom ? `CAA (inherited from ${d.caaInheritedFrom})` : "CAA"}
+        values={d.caa.map((c) => `flags=${c.critical} ${c.issue ?? c.issuewild ?? c.iodef ?? ""}`)}
+      />
 
       {d.soa && (
         <div className="card-elevated rounded-xl border border-base-700 bg-base-900/50 p-4">

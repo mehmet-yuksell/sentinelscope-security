@@ -10,6 +10,26 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 }
 
 /**
+ * CAA records apply to every name below the domain that publishes them
+ * (RFC 8659 §3): a CA checks the hostname, then each parent in turn, and uses
+ * the first non-empty set it finds. Looking only at the exact hostname would
+ * report "no CAA" for e.g. api.github.com even though github.com restricts
+ * issuance for it. Stops before the bare TLD.
+ */
+export async function resolveCaaWithInheritance(
+  hostname: string,
+  resolve: (name: string) => Promise<CaaRecord[]> = (name) => dnsPromises.resolveCaa(name)
+): Promise<{ records: CaaRecord[]; foundAt: string | null }> {
+  const labels = hostname.split(".");
+  for (let i = 0; labels.length - i >= 2; i++) {
+    const name = labels.slice(i).join(".");
+    const records = await safe(() => resolve(name), [] as CaaRecord[]);
+    if (records.length > 0) return { records, foundAt: name };
+  }
+  return { records: [], foundAt: null };
+}
+
+/**
  * Resolves the standard DNS record types for a hostname. Each record type is
  * queried independently and tolerantly — a missing record type (e.g. no MX)
  * is not an error, only an empty result for that type.
@@ -24,7 +44,7 @@ export async function analyzeDns(hostname: string): Promise<ProviderResult<DnsRe
       safe(() => dnsPromises.resolveTxt(hostname), [] as string[][]),
       safe(() => dnsPromises.resolveCname(hostname), [] as string[]),
       safe(() => dnsPromises.resolveSoa(hostname), null as SoaRecord | null),
-      safe(() => dnsPromises.resolveCaa(hostname), [] as CaaRecord[]),
+      resolveCaaWithInheritance(hostname),
       safe(() => dnsPromises.resolveTxt(`_dmarc.${hostname}`), [] as string[][]),
     ]);
     const dmarcRecord = dmarcTxt.map((chunks) => chunks.join("")).find((v) => v.startsWith("v=DMARC1")) ?? null;
@@ -37,7 +57,7 @@ export async function analyzeDns(hostname: string): Promise<ProviderResult<DnsRe
       txt.length > 0 ||
       cname.length > 0 ||
       soa !== null ||
-      caa.length > 0;
+      caa.foundAt === hostname; // CAA inherited from a parent says nothing about whether this name exists
 
     if (!hasAnyRecord) {
       return { status: "error", message: `No DNS records were found for ${hostname}.` };
@@ -61,12 +81,13 @@ export async function analyzeDns(hostname: string): Promise<ProviderResult<DnsRe
             minttl: soa.minttl,
           }
         : null,
-      caa: caa.map((record) => ({
+      caa: caa.records.map((record) => ({
         critical: record.critical,
         iodef: record.iodef,
         issue: record.issue,
         issuewild: record.issuewild,
       })),
+      ...(caa.foundAt && caa.foundAt !== hostname ? { caaInheritedFrom: caa.foundAt } : {}),
       dmarcRecord,
     };
 
