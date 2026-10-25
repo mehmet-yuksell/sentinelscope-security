@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getAnalysis } from "@/lib/store";
 import { ReportPrintButton } from "@/components/dashboard/ReportPrintButton";
-import { RISK_LEVEL_LABEL, SEVERITY_LABEL, formatDate, scoreToGrade } from "@/utils/riskDisplay";
+import { RISK_LEVEL_LABEL, SEVERITY_LABEL, displayGrade, displayScore, formatDate } from "@/utils/riskDisplay";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -42,11 +42,11 @@ export default async function ReportPage({ params }: PageProps) {
               {result.target}
             </h1>
             <p className="mt-2 text-sm text-neutral-600">
-              Generated {formatDate(result.timestamp)} · Risk Score {result.riskScore}/100 ({RISK_LEVEL_LABEL[result.riskLevel]})
+              Generated {formatDate(result.timestamp)} · Risk Score {displayScore(result.riskScore, result.riskLevel)}/100 ({RISK_LEVEL_LABEL[result.riskLevel]})
             </p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-4xl font-black">{scoreToGrade(result.riskScore)}</p>
+            <p className="text-4xl font-black">{displayGrade(result.riskScore, result.riskLevel)}</p>
             <p className="text-[10px] uppercase tracking-widest text-neutral-500">Grade</p>
           </div>
         </header>

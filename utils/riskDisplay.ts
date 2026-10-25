@@ -6,6 +6,7 @@ export const RISK_LEVEL_LABEL: Record<RiskLevel, string> = {
   moderate: "Moderate Risk",
   high: "High Risk",
   critical: "Critical Risk",
+  insufficient_data: "Insufficient Data",
 };
 
 export const RISK_LEVEL_COLOR: Record<RiskLevel, string> = {
@@ -14,7 +15,13 @@ export const RISK_LEVEL_COLOR: Record<RiskLevel, string> = {
   moderate: "#eab308",
   high: "#f97316",
   critical: "#ef4444",
+  insufficient_data: "#5c6472",
 };
+
+/** False when no factor had usable data — the UI must then show "N/A", never a score or grade. */
+export function hasRiskScore(level: RiskLevel): boolean {
+  return level !== "insufficient_data";
+}
 
 export const SEVERITY_COLOR: Record<FindingSeverity, string> = {
   info: "#60a5fa",
@@ -64,6 +71,16 @@ export function scoreToGrade(score: number): SecurityGrade {
   if (score < 50) return "C";
   if (score < 70) return "D";
   return "F";
+}
+
+/** Grade for display: "N/A" when there was no data to grade. */
+export function displayGrade(score: number, level: RiskLevel): SecurityGrade | "N/A" {
+  return hasRiskScore(level) ? scoreToGrade(score) : "N/A";
+}
+
+/** Score for display: "—" when there was no data to score. */
+export function displayScore(score: number, level: RiskLevel): string {
+  return hasRiskScore(level) ? String(score) : "—";
 }
 
 export const GRADE_COLOR: Record<SecurityGrade, string> = {

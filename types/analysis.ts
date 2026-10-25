@@ -127,7 +127,11 @@ export interface ThreatIntelInfo {
   abuseipdb: ProviderResult<ThreatIntelProviderFinding>;
 }
 
-export type RiskLevel = "very_low" | "low" | "moderate" | "high" | "critical";
+/**
+ * "insufficient_data" means no risk factor had usable data, so there is no
+ * score to report. `score` is 0 in that case and must not be displayed as one.
+ */
+export type RiskLevel = "very_low" | "low" | "moderate" | "high" | "critical" | "insufficient_data";
 
 export interface RiskFactorScore {
   key: string;

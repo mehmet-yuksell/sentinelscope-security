@@ -64,7 +64,9 @@ export default function MethodologyPage() {
           <p className="mb-5 text-sm leading-relaxed text-base-400">
             The score is a weighted average of the factors below. A factor whose data is unavailable — no
             threat-intel API key configured, a failed lookup — is excluded from the average entirely, and the
-            remaining weights are renormalized. Missing data is never silently scored as safe or risky.
+            remaining weights are renormalized. Missing data is never silently scored as safe or risky. If no
+            factor has usable data at all, the result is reported as &ldquo;Insufficient Data&rdquo; with no score
+            or grade.
           </p>
           <div className="overflow-hidden rounded-xl border border-base-700">
             <table className="w-full text-sm">

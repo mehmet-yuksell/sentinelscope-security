@@ -32,10 +32,17 @@ export function SecurityDna({ factors, hostname }: SecurityDnaProps) {
   const stroke = `hsl(${hue}, 85%, 60%)`;
   const gradientId = `securityDnaFill-${hue}`;
 
-  const data = factors.map((factor) => ({
-    label: SHORT_LABEL[factor.key] ?? factor.label,
-    health: factor.applicable ? 100 - factor.score : 0,
-  }));
+  // Only measured factors are plotted: drawing an unmeasured factor at 0
+  // would show "no data" as "worst possible health".
+  const data = factors
+    .filter((factor) => factor.applicable)
+    .map((factor) => ({
+      label: SHORT_LABEL[factor.key] ?? factor.label,
+      health: 100 - factor.score,
+    }));
+  const notMeasured = factors.filter((factor) => !factor.applicable).map((factor) => SHORT_LABEL[factor.key] ?? factor.label);
+  // A radar needs at least three axes to form a shape.
+  const canPlot = data.length >= 3;
 
   return (
     <div className="card-elevated relative overflow-hidden rounded-2xl border border-base-700 bg-base-900/60 p-6">
@@ -44,27 +51,36 @@ export function SecurityDna({ factors, hostname }: SecurityDnaProps) {
         <h3 className="text-xs font-bold uppercase tracking-widest text-base-500">Security DNA</h3>
         <span className="truncate font-mono text-[10px] text-base-600">fingerprint · {hostname}</span>
       </div>
-      <div className="relative h-80 w-full sm:h-96">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={data} outerRadius="48%" margin={{ top: 16, right: 16, bottom: 16, left: 16 }}>
-            <defs>
-              <radialGradient id={gradientId} cx="50%" cy="50%" r="65%">
-                <stop offset="0%" stopColor={stroke} stopOpacity={0.5} />
-                <stop offset="100%" stopColor={stroke} stopOpacity={0.06} />
-              </radialGradient>
-            </defs>
-            <PolarGrid stroke="#2a303c" />
-            <PolarAngleAxis dataKey="label" tick={{ fill: "#9ba3b3", fontSize: 10, fontWeight: 600 }} />
-            <Radar
-              dataKey="health"
-              stroke={stroke}
-              fill={`url(#${gradientId})`}
-              strokeWidth={3}
-              style={{ filter: `drop-shadow(0 0 8px ${stroke})` }}
-            />
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
+      {canPlot ? (
+        <div className="relative h-80 w-full sm:h-96">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart data={data} outerRadius="48%" margin={{ top: 16, right: 16, bottom: 16, left: 16 }}>
+              <defs>
+                <radialGradient id={gradientId} cx="50%" cy="50%" r="65%">
+                  <stop offset="0%" stopColor={stroke} stopOpacity={0.5} />
+                  <stop offset="100%" stopColor={stroke} stopOpacity={0.06} />
+                </radialGradient>
+              </defs>
+              <PolarGrid stroke="#2a303c" />
+              <PolarAngleAxis dataKey="label" tick={{ fill: "#9ba3b3", fontSize: 10, fontWeight: 600 }} />
+              <Radar
+                dataKey="health"
+                stroke={stroke}
+                fill={`url(#${gradientId})`}
+                strokeWidth={3}
+                style={{ filter: `drop-shadow(0 0 8px ${stroke})` }}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <p className="relative py-16 text-center text-sm text-base-500">
+          Not enough measured factors to draw a fingerprint ({data.length} of {factors.length} had usable data).
+        </p>
+      )}
+      {notMeasured.length > 0 && (
+        <p className="relative mt-2 text-center text-[11px] text-base-600">Not measured: {notMeasured.join(", ")}</p>
+      )}
     </div>
   );
 }

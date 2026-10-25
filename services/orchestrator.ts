@@ -167,7 +167,7 @@ export async function runAnalysis(rawTarget: string, options: RunAnalysisOptions
       false,
       onStage
     )) ?? {
-      risk: { score: 0, level: "very_low" as const, factors: [], summary: "Risk engine did not complete." },
+      risk: { score: 0, level: "insufficient_data" as const, factors: [], summary: "Risk engine did not complete." },
       findings: [],
     };
 

@@ -405,14 +405,6 @@ function levelForScore(score: number): RiskLevel {
   return "critical";
 }
 
-const LEVEL_LABEL: Record<RiskLevel, string> = {
-  very_low: "Very Low Risk",
-  low: "Low Risk",
-  moderate: "Moderate Risk",
-  high: "High Risk",
-  critical: "Critical Risk",
-};
-
 export interface RiskEngineInput {
   dns: ProviderResult<DnsRecordSet>;
   tls: ProviderResult<TlsInfo>;
@@ -431,7 +423,8 @@ export interface RiskEngineOutput {
  * factors. A factor whose underlying data is unavailable (no API key,
  * failed lookup, not applicable) is excluded entirely and the remaining
  * weights are renormalized — missing data never silently reads as "safe"
- * or "risky".
+ * or "risky". With no applicable factor at all, the level is
+ * "insufficient_data" rather than a 0 that would read as "very low risk".
  */
 export function computeRisk(input: RiskEngineInput): RiskEngineOutput {
   const factors: FactorResult[] = [
@@ -452,7 +445,7 @@ export function computeRisk(input: RiskEngineInput): RiskEngineOutput {
       ? Math.round(applicable.reduce((sum, f) => sum + (f.score * f.weight) / totalWeight, 0))
       : 0;
 
-  const level = levelForScore(score);
+  const level: RiskLevel = applicable.length > 0 ? levelForScore(score) : "insufficient_data";
   const findings = factors.flatMap((f) => f.findings);
 
   const factorScores: RiskFactorScore[] = factors.map((f) => ({
@@ -483,5 +476,3 @@ const SEVERITY_ORDER: Record<Finding["severity"], number> = {
   low: 1,
   info: 0,
 };
-
-export { LEVEL_LABEL };

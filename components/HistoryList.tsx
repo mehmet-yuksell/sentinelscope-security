@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { HistoryEntry } from "@/types/analysis";
-import { RISK_LEVEL_COLOR, formatRelativeTime } from "@/utils/riskDisplay";
+import { RISK_LEVEL_COLOR, displayScore, formatRelativeTime } from "@/utils/riskDisplay";
 import { getRecentAnalyses } from "@/utils/clientHistory";
 
 /**
@@ -42,7 +42,7 @@ export function HistoryList() {
                 className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold"
                 style={{ color: RISK_LEVEL_COLOR[entry.riskLevel], backgroundColor: `${RISK_LEVEL_COLOR[entry.riskLevel]}1a` }}
               >
-                {entry.riskScore}
+                {displayScore(entry.riskScore, entry.riskLevel)}
                 <span className="text-xs font-medium text-base-500">/100</span>
               </div>
             </Link>

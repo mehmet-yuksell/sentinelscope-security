@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { AnalysisResult } from "@/types/analysis";
-import { RISK_LEVEL_COLOR, RISK_LEVEL_LABEL, formatDate, scoreToGrade } from "@/utils/riskDisplay";
+import { RISK_LEVEL_COLOR, RISK_LEVEL_LABEL, displayGrade, displayScore, formatDate } from "@/utils/riskDisplay";
 import { SiteNav } from "@/components/SiteNav";
 import { OverviewPanel } from "./OverviewPanel";
 import { DnsPanel } from "./DnsPanel";
@@ -21,7 +21,7 @@ export function AnalysisDashboard({ result }: { result: AnalysisResult }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const color = RISK_LEVEL_COLOR[result.riskLevel];
 
-  const grade = scoreToGrade(result.riskScore);
+  const grade = displayGrade(result.riskScore, result.riskLevel);
 
   return (
     <div>
@@ -51,7 +51,7 @@ export function AnalysisDashboard({ result }: { result: AnalysisResult }) {
             <div className="text-right">
               <p className="text-xs font-semibold uppercase tracking-widest text-base-500">Risk Score</p>
               <p className="text-3xl font-extrabold tracking-tight" style={{ color }}>
-                {result.riskScore}
+                {displayScore(result.riskScore, result.riskLevel)}
                 <span className="text-base font-medium text-base-500">/100</span>
               </p>
               <p className="text-xs font-bold uppercase tracking-wide" style={{ color }}>

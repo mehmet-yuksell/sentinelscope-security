@@ -30,12 +30,19 @@ const healthyTls: TlsInfo = {
 };
 
 describe("computeRisk", () => {
-  it("returns a score of 0 with an explanatory summary when no data is applicable", () => {
+  it("reports insufficient data — not a 'very low risk' verdict — when no factor is applicable", () => {
     const { risk, findings } = computeRisk(baseInput());
+    expect(risk.level).toBe("insufficient_data");
     expect(risk.score).toBe(0);
     expect(risk.factors.every((f) => !f.applicable)).toBe(true);
     expect(findings).toHaveLength(0);
     expect(risk.summary).toMatch(/insufficient data/i);
+  });
+
+  it("assigns a real risk level as soon as one factor has usable data", () => {
+    const input = baseInput();
+    input.tls = { status: "ok", data: healthyTls };
+    expect(computeRisk(input).risk.level).toBe("very_low");
   });
 
   it("excludes unavailable factors from the weighted average instead of scoring them as safe or risky", () => {
