@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest a new check, data source, or improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to find out or do that SentinelScope doesn't support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should it work? If it adds a data source, which one, and does it need an API key?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other tools or approaches you've looked at.
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: The feature keeps SentinelScope passive — no exploitation, brute forcing, port scanning, or load testing.
+          required: true
+        - label: It works from real data, and degrades to "Unavailable" rather than inventing a result when data is missing.
+          required: true
