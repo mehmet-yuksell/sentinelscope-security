@@ -81,14 +81,17 @@ function performHop(
         let size = 0;
         const chunks: Buffer[] = [];
         res.on("data", (chunk: Buffer) => {
+          if (settled) return;
           size += chunk.length;
+          chunks.push(chunk);
           if (size > options.maxBodyBytes) {
+            // Keep the first maxBodyBytes for analysis and stop reading the rest.
             settled = true;
             req.destroy();
             resolve({
               statusCode: res.statusCode ?? 0,
               headers: normalizeHeaders(res.headers),
-              body: Buffer.concat(chunks).toString("utf-8"),
+              body: Buffer.concat(chunks).subarray(0, options.maxBodyBytes).toString("utf-8"),
             });
           }
         });
