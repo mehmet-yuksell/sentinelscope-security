@@ -9,12 +9,13 @@ export const metadata: Metadata = {
 
 const PIPELINE_STAGES = [
   { name: "Target Validation", detail: "Parses the input and rejects anything pointed at private, loopback, or reserved address space before any network call is made." },
-  { name: "DNS Intelligence", detail: "Resolves A/AAAA/MX/NS/TXT/CNAME/SOA/CAA records plus a DMARC lookup, tolerant of any single record type being absent." },
+  { name: "DNS Intelligence", detail: "Resolves A/AAAA/MX/NS/TXT/CNAME/SOA/CAA records plus a DMARC lookup, tolerant of any single record type being absent. CAA is inherited from parent domains, as certificate authorities apply it." },
+  { name: "Email Security", detail: "SPF (including the 10-DNS-lookup limit across includes), DMARC with organizational-domain fallback, MTA-STS, and TLS-RPT — all from DNS plus the MTA-STS policy file. DKIM is not checked: its selectors can't be discovered from DNS." },
   { name: "IP Intelligence", detail: "ASN, organization, and geolocation for the resolved address, plus a real reverse-DNS lookup." },
   { name: "TLS Analysis", detail: "A real TLS handshake against the target, pinned to its validated IP — certificate chain, protocol version, and expiry." },
   { name: "HTTP Analysis", detail: "One SSRF-safe fetch, redirect chain included, graded against six standard security headers." },
   { name: "Technology Detection", detail: "Passive fingerprinting of server, CDN, framework, and CMS from the same response — no separate probing requests." },
-  { name: "Domain Intelligence", detail: "Registrar, registration date, and status via RDAP, the IETF-standard successor to WHOIS." },
+  { name: "Domain Intelligence", detail: "Registrar, registration date, and status via RDAP, the IETF-standard successor to WHOIS — looked up for the registered domain, since registries hold no records for subdomains." },
   { name: "Threat Intelligence", detail: "VirusTotal and AbuseIPDB, only when their API keys are configured — otherwise reported as unavailable, never guessed." },
   { name: "Risk Engine", detail: "Combines every stage's real findings into one weighted score. See below." },
 ];
@@ -22,7 +23,8 @@ const PIPELINE_STAGES = [
 const RISK_FACTORS: [string, string, string][] = [
   ["TLS Security", "22%", "Certificate validity, expiry, protocol version"],
   ["HTTP Security Headers", "20%", "HSTS, CSP, X-Frame-Options, and four others"],
-  ["DNS Configuration", "12%", "CAA, SPF, DMARC, nameserver redundancy"],
+  ["DNS Configuration", "6%", "CAA, nameserver redundancy"],
+  ["Email Security", "6%", "SPF policy and lookup limit, DMARC policy, MTA-STS"],
   ["Domain Reputation", "12%", "Registration age, RDAP status flags"],
   ["IP Reputation", "12%", "AbuseIPDB confidence score"],
   ["Threat Intelligence", "14%", "VirusTotal engine verdicts"],

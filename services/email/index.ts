@@ -108,6 +108,7 @@ interface SpfWalkState {
   lookups: number;
   visited: Set<string>;
   warnings: string[];
+  brokenReferences: string[];
   /** SPF records fetched for include/redirect targets, by domain. */
   records: Map<string, string>;
 }
@@ -145,6 +146,7 @@ async function walkSpf(deps: EmailDeps, record: string, state: SpfWalkState, dep
       continue;
     }
     if (spf.length !== 1) {
+      state.brokenReferences.push(target);
       state.warnings.push(
         spf.length === 0
           ? `${target} (via ${term.name}) has no SPF record, which makes SPF evaluation fail.`
@@ -173,13 +175,14 @@ async function analyzeSpf(deps: EmailDeps, hostname: string, rootTxt: string[]):
     lookupLimitExceeded: false,
     includes: [],
     warnings: [],
+    brokenReferences: [],
   };
   if (records.length !== 1) return base;
 
   const record = records[0]!.trim();
   const terms = parseSpfTerms(record);
   const redirect = followsRedirect(terms)?.value?.toLowerCase() ?? null;
-  const state: SpfWalkState = { lookups: 0, visited: new Set([hostname]), warnings: [], records: new Map() };
+  const state: SpfWalkState = { lookups: 0, visited: new Set([hostname]), warnings: [], brokenReferences: [], records: new Map() };
   await walkSpf(deps, record, state, 0);
 
   // Without its own `all`, a record's default comes from its redirect target.
@@ -197,6 +200,7 @@ async function analyzeSpf(deps: EmailDeps, hostname: string, rootTxt: string[]):
     lookupLimitExceeded: state.lookups > SPF_LOOKUP_LIMIT,
     includes: terms.filter((t) => t.kind === "mechanism" && t.name === "include" && t.value).map((t) => t.value!),
     warnings: state.warnings,
+    brokenReferences: state.brokenReferences,
   };
 }
 

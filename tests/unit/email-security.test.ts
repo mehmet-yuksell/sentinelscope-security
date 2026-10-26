@@ -113,6 +113,7 @@ describe("analyzeEmailSecurity — SPF", () => {
       dnsLookups: 1,
       lookupLimitExceeded: false,
       warnings: [],
+      brokenReferences: [],
     });
   });
 
@@ -153,6 +154,7 @@ describe("analyzeEmailSecurity — SPF", () => {
   it("warns when an include target has no SPF record", async () => {
     const { data } = await analyze("example.com", { txt: { "example.com": ["v=spf1 include:missing.example -all"] } });
     expect(data.spf.warnings).toEqual([expect.stringMatching(/missing\.example .*no SPF record/)]);
+    expect(data.spf.brokenReferences).toEqual(["missing.example"]);
   });
 
   it("takes the all qualifier from a redirect= target when the record has none", async () => {

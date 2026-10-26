@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeRisk, type RiskEngineInput } from "@/services/risk-engine";
-import type { DnsRecordSet, DomainIntelInfo, HttpInfo, ThreatIntelInfo, TlsInfo } from "@/types/analysis";
+import type { DnsRecordSet, DomainIntelInfo, EmailSecurityInfo, HttpInfo, ThreatIntelInfo, TlsInfo } from "@/types/analysis";
 
 function baseInput(): RiskEngineInput {
   return {
@@ -165,5 +165,109 @@ describe("computeRisk", () => {
       const currentRank = severityRank[findings[i]!.severity] ?? 0;
       expect(previousRank).toBeGreaterThanOrEqual(currentRank);
     }
+  });
+});
+
+/** A well-configured mail domain; tests override one aspect at a time. */
+function goodEmail(overrides: Partial<EmailSecurityInfo> = {}): EmailSecurityInfo {
+  return {
+    domain: "example.com",
+    organizationalDomain: "example.com",
+    receivesMail: true,
+    spf: {
+      record: "v=spf1 include:_spf.example.net -all",
+      recordCount: 1,
+      allQualifier: "-",
+      redirect: null,
+      dnsLookups: 1,
+      lookupLimitExceeded: false,
+      includes: ["_spf.example.net"],
+      warnings: [],
+      brokenReferences: [],
+    },
+    dmarc: {
+      record: "v=DMARC1; p=reject",
+      foundAt: "_dmarc.example.com",
+      inherited: false,
+      recordCount: 1,
+      valid: true,
+      policy: "reject",
+      subdomainPolicy: null,
+      effectivePolicy: "reject",
+      pct: 100,
+      reportingUris: [],
+    },
+    mtaSts: { record: "v=STSv1; id=1", policyMode: "enforce", policyMaxAge: 86400, policyError: null },
+    tlsRptRecord: null,
+    ...overrides,
+  };
+}
+
+function emailRisk(email: EmailSecurityInfo) {
+  const input = baseInput();
+  input.email = { status: "ok", data: email };
+  const { risk, findings } = computeRisk(input);
+  return { factor: risk.factors.find((f) => f.key === "email_security")!, findings };
+}
+
+describe("computeRisk — email security factor", () => {
+  it("keeps the documented weights summing to 100%", () => {
+    const { risk } = computeRisk(baseInput());
+    expect(risk.factors.reduce((sum, f) => sum + f.weight, 0)).toBeCloseTo(1, 10);
+  });
+
+  it("scores a well-configured mail domain as low risk with no findings", () => {
+    const { factor, findings } = emailRisk(goodEmail());
+    expect(factor.applicable).toBe(true);
+    expect(factor.score).toBe(5);
+    expect(findings).toHaveLength(0);
+  });
+
+  it("is excluded — not scored as safe — when the domain neither receives mail nor publishes email policy", () => {
+    const empty = goodEmail({ receivesMail: false });
+    empty.spf = { ...empty.spf, record: null, recordCount: 0, allQualifier: null };
+    empty.dmarc = { ...empty.dmarc, record: null, recordCount: 0, valid: false, policy: null, effectivePolicy: null };
+    expect(emailRisk(empty).factor.applicable).toBe(false);
+  });
+
+  it("is excluded when the email stage failed or did not run", () => {
+    const input = baseInput();
+    input.email = { status: "error", message: "SERVFAIL" };
+    expect(computeRisk(input).risk.factors.find((f) => f.key === "email_security")!.applicable).toBe(false);
+  });
+
+  it("flags missing SPF and DMARC on a domain that receives mail", () => {
+    const email = goodEmail();
+    email.spf = { ...email.spf, record: null, recordCount: 0, allQualifier: null };
+    email.dmarc = { ...email.dmarc, record: null, recordCount: 0, valid: false, policy: null, effectivePolicy: null };
+    const titles = emailRisk(email).findings.map((f) => f.title);
+    expect(titles).toEqual(expect.arrayContaining(["No SPF record found", "No DMARC record found"]));
+  });
+
+  it("treats +all as high severity", () => {
+    const email = goodEmail();
+    email.spf = { ...email.spf, record: "v=spf1 +all", allQualifier: "+" };
+    expect(emailRisk(email).findings).toContainEqual(expect.objectContaining({ severity: "high", title: "SPF record allows any sender (+all)" }));
+  });
+
+  it("flags the SPF lookup limit and broken include targets", () => {
+    const email = goodEmail();
+    email.spf = { ...email.spf, lookupLimitExceeded: true, dnsLookups: 11, brokenReferences: ["gone.example"] };
+    const titles = emailRisk(email).findings.map((f) => f.title);
+    expect(titles).toContain("SPF record exceeds the 10 DNS lookup limit");
+    expect(titles).toContain("SPF record references a domain without a usable SPF record");
+  });
+
+  it("flags a monitoring-only DMARC policy, including one inherited from the organizational domain", () => {
+    const email = goodEmail();
+    email.dmarc = { ...email.dmarc, inherited: true, foundAt: "_dmarc.example.com", policy: "reject", subdomainPolicy: "none", effectivePolicy: "none" };
+    const finding = emailRisk(email).findings.find((f) => f.title.startsWith("DMARC policy is monitoring-only"));
+    expect(finding?.description).toMatch(/inherited from _dmarc\.example\.com/);
+  });
+
+  it("reports a missing MTA-STS policy as information only, without raising the score", () => {
+    const { factor, findings } = emailRisk(goodEmail({ mtaSts: { record: null, policyMode: null, policyMaxAge: null, policyError: null } }));
+    expect(findings).toEqual([expect.objectContaining({ severity: "info", title: "No MTA-STS policy" })]);
+    expect(factor.score).toBe(5);
   });
 });

@@ -1,6 +1,7 @@
 import type {
   DnsRecordSet,
   DomainIntelInfo,
+  EmailSecurityInfo,
   Finding,
   HttpInfo,
   ProviderResult,
@@ -170,7 +171,7 @@ function scoreHttpHeaders(http: ProviderResult<HttpInfo>): FactorResult {
 
 function scoreDnsConfig(dns: ProviderResult<DnsRecordSet>): FactorResult {
   const findings: Finding[] = [];
-  const base: FactorResult = { key: "dns_config", label: "DNS Configuration", weight: 0.12, score: null, findings };
+  const base: FactorResult = { key: "dns_config", label: "DNS Configuration", weight: 0.06, score: null, findings };
 
   if (dns.status !== "ok" || !dns.data) return base;
 
@@ -190,33 +191,6 @@ function scoreDnsConfig(dns: ProviderResult<DnsRecordSet>): FactorResult {
     );
   }
 
-  const hasSpf = data.txt.some((chunks) => chunks.join("").toLowerCase().startsWith("v=spf1"));
-  if (data.mx.length > 0 && !hasSpf) {
-    score += 20;
-    findings.push(
-      finding({
-        severity: "medium",
-        title: "No SPF record found",
-        description: "The domain accepts mail (MX records present) but has no SPF record, making it easier to spoof sender addresses.",
-        recommendation: "Publish an SPF TXT record authorizing legitimate mail servers.",
-        source: "DNS Intelligence",
-      })
-    );
-  }
-
-  if (data.mx.length > 0 && !data.dmarcRecord) {
-    score += 20;
-    findings.push(
-      finding({
-        severity: "medium",
-        title: "No DMARC record found",
-        description: "No DMARC policy was found at _dmarc, reducing protection against email spoofing and phishing using this domain.",
-        recommendation: "Publish a DMARC TXT record (starting with v=DMARC1) with at least a monitoring policy.",
-        source: "DNS Intelligence",
-      })
-    );
-  }
-
   if (data.ns.length === 1) {
     score += 10;
     findings.push(
@@ -228,6 +202,197 @@ function scoreDnsConfig(dns: ProviderResult<DnsRecordSet>): FactorResult {
         source: "DNS Intelligence",
       })
     );
+  }
+
+  return { ...base, score: clamp(score) };
+}
+
+// --- Email Security -----------------------------------------------------
+
+function scoreEmailSecurity(email: ProviderResult<EmailSecurityInfo> | undefined): FactorResult {
+  const findings: Finding[] = [];
+  const base: FactorResult = { key: "email_security", label: "Email Security", weight: 0.06, score: null, findings };
+
+  if (!email || email.status !== "ok" || !email.data) return base;
+  const { receivesMail, spf, dmarc, mtaSts } = email.data;
+
+  // A domain that neither receives mail nor publishes any email policy gives
+  // nothing to assess — excluded, rather than scored as safe.
+  if (!receivesMail && spf.recordCount === 0 && dmarc.recordCount === 0) return base;
+
+  let score = 5;
+  const source = "Email Security";
+
+  // SPF ------------------------------------------------------------------
+  if (spf.recordCount === 0 && receivesMail) {
+    score += 30;
+    findings.push(
+      finding({
+        severity: "medium",
+        title: "No SPF record found",
+        description: "The domain accepts mail (MX records present) but publishes no SPF record, so receivers can't tell which servers may send mail as this domain.",
+        recommendation: "Publish an SPF TXT record listing your legitimate mail servers and ending in -all or ~all.",
+        source,
+      })
+    );
+  } else if (spf.recordCount > 1) {
+    score += 25;
+    findings.push(
+      finding({
+        severity: "medium",
+        title: "Multiple SPF records",
+        description: `The domain publishes ${spf.recordCount} SPF records. RFC 7208 treats this as a permanent error, so SPF fails for all mail from this domain.`,
+        evidence: `${spf.recordCount} v=spf1 records`,
+        recommendation: "Merge the SPF records into a single v=spf1 TXT record.",
+        source,
+      })
+    );
+  } else if (spf.record) {
+    if (spf.allQualifier === "+") {
+      score += 40;
+      findings.push(
+        finding({
+          severity: "high",
+          title: "SPF record allows any sender (+all)",
+          description: "The SPF record ends in +all, which authorizes every server on the internet to send mail as this domain.",
+          evidence: spf.record,
+          recommendation: "Replace +all with -all (or ~all while testing) so unlisted servers fail SPF.",
+          source,
+        })
+      );
+    } else if (spf.allQualifier === "?" || spf.allQualifier === null) {
+      score += 15;
+      findings.push(
+        finding({
+          severity: "medium",
+          title: "SPF record does not reject unauthorized senders",
+          description:
+            spf.allQualifier === "?"
+              ? "The SPF record ends in ?all (neutral), which gives receivers no instruction about mail from unlisted servers."
+              : "The SPF record has no all mechanism, so mail from unlisted servers gets a neutral result.",
+          evidence: spf.record,
+          recommendation: "End the SPF record with -all (or ~all while testing).",
+          source,
+        })
+      );
+    }
+    if (spf.lookupLimitExceeded) {
+      score += 20;
+      findings.push(
+        finding({
+          severity: "medium",
+          title: "SPF record exceeds the 10 DNS lookup limit",
+          description: "Evaluating the SPF record (including nested includes) needs more than 10 DNS lookups. RFC 7208 makes that a permanent error, so SPF fails.",
+          evidence: `More than ${spf.dnsLookups - 1} DNS-querying terms`,
+          recommendation: "Flatten or remove include: mechanisms to stay within 10 lookups.",
+          source,
+        })
+      );
+    }
+    if (spf.brokenReferences.length > 0) {
+      score += 20;
+      findings.push(
+        finding({
+          severity: "medium",
+          title: "SPF record references a domain without a usable SPF record",
+          description: "An include: or redirect= target has no SPF record (or several), which makes SPF evaluation fail with a permanent error.",
+          evidence: spf.brokenReferences.join(", "),
+          recommendation: "Remove or fix the broken include/redirect targets.",
+          source,
+        })
+      );
+    }
+  }
+
+  // DMARC ----------------------------------------------------------------
+  if (dmarc.recordCount === 0) {
+    if (receivesMail) {
+      score += 30;
+      findings.push(
+        finding({
+          severity: "medium",
+          title: "No DMARC record found",
+          description: "No DMARC policy was found for this domain or its organizational domain, so receivers have no instruction for mail that fails SPF/DKIM — making spoofing and phishing easier.",
+          recommendation: "Publish a DMARC TXT record at _dmarc (v=DMARC1) — start with p=none and reporting, then move to quarantine or reject.",
+          source,
+        })
+      );
+    }
+  } else if (dmarc.recordCount > 1) {
+    score += 20;
+    findings.push(
+      finding({
+        severity: "medium",
+        title: "Multiple DMARC records",
+        description: "More than one DMARC record was found, so receivers apply no DMARC policy at all.",
+        evidence: dmarc.foundAt ?? undefined,
+        recommendation: "Keep a single v=DMARC1 record.",
+        source,
+      })
+    );
+  } else if (!dmarc.valid) {
+    score += 20;
+    findings.push(
+      finding({
+        severity: "medium",
+        title: "DMARC record has no valid policy",
+        description: "The DMARC record is missing a valid p= tag (none, quarantine, or reject), so it is not applied.",
+        evidence: dmarc.record ?? undefined,
+        recommendation: "Add a valid p= tag to the DMARC record.",
+        source,
+      })
+    );
+  } else if (dmarc.effectivePolicy === "none") {
+    score += 15;
+    findings.push(
+      finding({
+        severity: "low",
+        title: "DMARC policy is monitoring-only (p=none)",
+        description: `The DMARC policy${dmarc.inherited ? ` inherited from ${dmarc.foundAt}` : ""} only requests reports; mail that fails authentication is still delivered.`,
+        evidence: dmarc.record ?? undefined,
+        recommendation: "Once reports show legitimate mail passes, move the policy to p=quarantine or p=reject.",
+        source,
+      })
+    );
+  } else if (dmarc.pct < 100) {
+    score += 5;
+    findings.push(
+      finding({
+        severity: "low",
+        title: `DMARC policy applies to only ${dmarc.pct}% of failing mail`,
+        description: "The pct= tag limits enforcement to a sample of messages that fail authentication.",
+        evidence: dmarc.record ?? undefined,
+        recommendation: "Raise pct to 100 once the policy has been validated.",
+        source,
+      })
+    );
+  }
+
+  // MTA-STS (informational: still uncommon, so absence isn't scored) --------
+  if (receivesMail) {
+    if (!mtaSts.record) {
+      findings.push(
+        finding({
+          severity: "info",
+          title: "No MTA-STS policy",
+          description: "Without MTA-STS, servers sending mail to this domain can be downgraded to unencrypted SMTP by an attacker on the network path.",
+          recommendation: "Publish an MTA-STS policy (an _mta-sts TXT record plus https://mta-sts.<domain>/.well-known/mta-sts.txt).",
+          source,
+        })
+      );
+    } else if (mtaSts.policyError) {
+      score += 5;
+      findings.push(
+        finding({
+          severity: "low",
+          title: "MTA-STS policy could not be retrieved",
+          description: "An _mta-sts record is published, but the policy file it points to could not be used, so sending servers will ignore MTA-STS.",
+          evidence: mtaSts.policyError,
+          recommendation: "Serve a valid policy at https://mta-sts.<domain>/.well-known/mta-sts.txt over HTTPS without redirects.",
+          source,
+        })
+      );
+    }
   }
 
   return { ...base, score: clamp(score) };
@@ -411,6 +576,8 @@ export interface RiskEngineInput {
   http: ProviderResult<HttpInfo>;
   domain: ProviderResult<DomainIntelInfo>;
   threatIntelligence: ThreatIntelInfo;
+  /** Optional so callers without email data (and older tests) still work; absent means "not measured". */
+  email?: ProviderResult<EmailSecurityInfo>;
 }
 
 export interface RiskEngineOutput {
@@ -431,6 +598,7 @@ export function computeRisk(input: RiskEngineInput): RiskEngineOutput {
     scoreTls(input.tls),
     scoreHttpHeaders(input.http),
     scoreDnsConfig(input.dns),
+    scoreEmailSecurity(input.email),
     scoreDomainReputation(input.domain),
     scoreIpReputation(input.threatIntelligence),
     scoreThreatIntelligence(input.threatIntelligence),

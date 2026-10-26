@@ -7,6 +7,7 @@ import { RISK_LEVEL_COLOR, RISK_LEVEL_LABEL, displayGrade, displayScore, formatD
 import { SiteNav } from "@/components/SiteNav";
 import { OverviewPanel } from "./OverviewPanel";
 import { DnsPanel } from "./DnsPanel";
+import { EmailPanel } from "./EmailPanel";
 import { TlsPanel } from "./TlsPanel";
 import { HttpPanel } from "./HttpPanel";
 import { IpPanel } from "./IpPanel";
@@ -14,7 +15,7 @@ import { DomainPanel } from "./DomainPanel";
 import { ThreatIntelPanel } from "./ThreatIntelPanel";
 import { FindingsPanel } from "./FindingsPanel";
 
-const TABS = ["Overview", "DNS", "TLS", "HTTP", "IP", "Domain", "Threat Intelligence", "Findings"] as const;
+const TABS = ["Overview", "DNS", "Email", "TLS", "HTTP", "IP", "Domain", "Threat Intelligence", "Findings"] as const;
 type Tab = (typeof TABS)[number];
 
 export function AnalysisDashboard({ result }: { result: AnalysisResult }) {
@@ -85,6 +86,7 @@ export function AnalysisDashboard({ result }: { result: AnalysisResult }) {
       <div className="animate-fadeIn">
         {tab === "Overview" && <OverviewPanel result={result} />}
         {tab === "DNS" && <DnsPanel dns={result.dns} />}
+        {tab === "Email" && <EmailPanel email={result.email} />}
         {tab === "TLS" && <TlsPanel tls={result.tls} />}
         {tab === "HTTP" && <HttpPanel http={result.http} technologies={result.technologies} />}
         {tab === "IP" && <IpPanel ip={result.ip} />}

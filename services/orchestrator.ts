@@ -3,6 +3,7 @@ import { parseTarget } from "@/lib/validation/target";
 import { getRegistrableDomain } from "@/lib/dns/registrableDomain";
 import { resolveAndAssertPublic } from "@/lib/security/ssrf";
 import { analyzeDns } from "@/services/dns";
+import { analyzeEmailSecurity } from "@/services/email";
 import { analyzeIp } from "@/services/ip";
 import { analyzeTls } from "@/services/tls";
 import { fetchTargetPage, buildHttpInfo } from "@/services/http";
@@ -14,6 +15,7 @@ import type {
   AnalysisResult,
   DnsRecordSet,
   DomainIntelInfo,
+  EmailSecurityInfo,
   HttpInfo,
   IpIntelInfo,
   PipelineStage,
@@ -58,7 +60,7 @@ async function runStage<T>(
 
 /**
  * Runs the full passive analysis pipeline for a single target:
- * validation -> DNS -> IP -> TLS -> HTTP -> technology -> domain ->
+ * validation -> DNS -> email -> IP -> TLS -> HTTP -> technology -> domain ->
  * threat intelligence -> risk engine, producing one normalized
  * AnalysisResult the frontend never has to special-case per provider.
  * When `onStage` is provided, each stage's real completion is reported as
@@ -82,6 +84,15 @@ export async function runAnalysis(rawTarget: string, options: RunAnalysisOptions
       pipeline,
       () => analyzeDns(target.hostname),
       isIpTarget && "DNS record lookup does not apply to a literal IP target.",
+      onStage
+    )) ?? { status: "not_applicable" };
+
+  const email: ProviderResult<EmailSecurityInfo> =
+    (await runStage(
+      "email",
+      pipeline,
+      () => analyzeEmailSecurity(target.hostname),
+      isIpTarget && "Email security checks do not apply to a literal IP target.",
       onStage
     )) ?? { status: "not_applicable" };
 
@@ -165,7 +176,7 @@ export async function runAnalysis(rawTarget: string, options: RunAnalysisOptions
     (await runStage(
       "risk_engine",
       pipeline,
-      async () => computeRisk({ dns, tls, http, domain, threatIntelligence }),
+      async () => computeRisk({ dns, email, tls, http, domain, threatIntelligence }),
       false,
       onStage
     )) ?? {
@@ -184,6 +195,7 @@ export async function runAnalysis(rawTarget: string, options: RunAnalysisOptions
     riskLevel: risk.level,
     risk,
     dns,
+    email,
     tls,
     http,
     ip,

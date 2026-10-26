@@ -15,6 +15,7 @@ const SHORT_LABEL: Record<string, string> = {
   tls: "TLS",
   http_headers: "HTTP Headers",
   dns_config: "DNS",
+  email_security: "Email",
   domain_reputation: "Domain Rep.",
   ip_reputation: "IP Rep.",
   threat_intelligence: "Threat Intel",

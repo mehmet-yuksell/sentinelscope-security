@@ -70,6 +70,8 @@ export interface SpfAnalysis {
   includes: string[];
   /** Problems found while following the record, e.g. an include with no SPF record. */
   warnings: string[];
+  /** include/redirect targets with no or multiple SPF records — each makes SPF evaluation fail (permerror). */
+  brokenReferences: string[];
 }
 
 export type DmarcPolicy = "none" | "quarantine" | "reject";

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getAnalysis } from "@/lib/store";
 import { ReportPrintButton } from "@/components/dashboard/ReportPrintButton";
 import { RISK_LEVEL_LABEL, SEVERITY_LABEL, displayGrade, displayScore, formatDate } from "@/utils/riskDisplay";
+import { summarizeDmarc, summarizeSpf } from "@/utils/emailDisplay";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -108,6 +109,19 @@ export default async function ReportPage({ params }: PageProps) {
           )}
         </Section>
 
+        <Section title="Email Security">
+          {result.email?.status === "ok" && result.email.data ? (
+            <div className="space-y-1 text-sm text-neutral-700">
+              <p>Receives mail: {result.email.data.receivesMail ? "Yes" : "No"}</p>
+              <p>SPF: {summarizeSpf(result.email.data.spf)}</p>
+              <p>DMARC: {summarizeDmarc(result.email.data.dmarc)}</p>
+              <p>MTA-STS: {result.email.data.mtaSts.policyMode ?? (result.email.data.mtaSts.record ? "Policy unavailable" : "Not published")}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-500">{result.email?.message ?? "Not available."}</p>
+          )}
+        </Section>
+
         <Section title="TLS">
           {result.tls.status === "ok" && result.tls.data ? (
             <div className="space-y-1 text-sm text-neutral-700">
@@ -153,8 +167,8 @@ export default async function ReportPage({ params }: PageProps) {
         <Section title="Methodology">
           <p className="text-sm leading-relaxed text-neutral-700">
             The risk score is a weighted average of independently scored factors (TLS Security, HTTP Security
-            Headers, DNS Configuration, Domain Reputation, IP Reputation, Threat Intelligence, and Configuration
-            Findings). A factor is excluded from the average — never scored as safe or risky by default — when its
+            Headers, DNS Configuration, Email Security, Domain Reputation, IP Reputation, Threat Intelligence, and
+            Configuration Findings). A factor is excluded from the average — never scored as safe or risky by default — when its
             underlying data is unavailable, such as a threat-intelligence provider with no configured API key.
             Score ranges: 0–19 Very Low, 20–39 Low, 40–59 Moderate, 60–79 High, 80–100 Critical.
           </p>
