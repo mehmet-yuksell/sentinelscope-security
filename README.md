@@ -174,6 +174,7 @@ are clearly labeled *Unavailable* and excluded from the score.
 | `RATE_LIMIT_MAX` | Analyze requests per client IP per window | `10` |
 | `RATE_LIMIT_WINDOW_MS` | Rate-limit window in ms | `60000` |
 | `ANALYSIS_CACHE_TTL_MS` | How long an identical target is served from cache | `300000` |
+| `LOG_LEVEL` | Minimum server log level: `debug`, `info`, `warn`, `error`, `silent` | `info` |
 | `UPSTASH_REDIS_REST_URL` | Persistent store and shared rate limiting — needed on serverless | — |
 | `UPSTASH_REDIS_REST_TOKEN` | Paired with the URL above | — |
 
@@ -253,7 +254,9 @@ The exact rules behind each factor and finding are in
 - **Input validation.** Only `http`/`https`, ports 80/443, and URLs without
   embedded credentials are accepted.
 - **Rate limiting** per client IP, shared across instances when Redis is
-  configured (`lib/rateLimit.ts`).
+  configured; if Redis is unreachable the limiter falls back to a
+  per-instance limit instead of failing requests (`lib/rateLimit.ts`). The
+  in-memory limiter and result cache are size-bounded.
 - **Timeouts and caps.** Each outbound HTTP hop has a hard deadline (8 s by
   default), at most 5 redirects, and a 2 MB response cap; TLS, RDAP, IP and
   reputation lookups have their own timeouts.
@@ -261,6 +264,9 @@ The exact rules behind each factor and finding are in
   `services/threat-intelligence` and never reach the client.
 - **No cross-visitor history.** Analyses are retrievable only by their
   unguessable UUID; there is no "list everything" endpoint.
+- **Errors don't leak.** Clients get validation messages or a generic error;
+  details go to structured JSON server logs (`lib/logger.ts`), which never
+  include API keys or the analyzed targets.
 - **Dependency hygiene.** Dependabot opens weekly update PRs, and CI fails
   on high or critical advisories in runtime dependencies.
 
@@ -300,27 +306,42 @@ Builds the multi-stage image (Next.js standalone output), serves the app on
 http://localhost:3000, and persists results to a named volume. API keys are
 read from a `.env` file in the project root or from the shell environment.
 
+Rate limiting keys on the client IP from `X-Forwarded-For` / `X-Real-IP`.
+Vercel sets these itself; on your own server, run SentinelScope behind a
+reverse proxy (nginx, Caddy, Traefik) that overwrites them, rather than
+exposing port 3000 directly — otherwise clients can spoof the header to
+avoid the limit.
+
 ## Testing
 
 ```bash
 npm run lint
 npm run typecheck
-npm test
+npm test               # or: npm run test:coverage
 npm run build
 ```
 
-CI runs all four on every push to `main` and every pull request, plus a
-production dependency audit.
+CI runs these on every push to `main` and every pull request, together with
+a production dependency audit and a Docker image build. Tests run with
+coverage, and CI fails if coverage of the API routes, `lib/`, `services/`
+and `utils/` drops below 90% of lines, statements and functions or 75% of
+branches (currently about 93% of lines). React components are not
+unit-tested and are excluded from that measurement.
 
-- **Unit tests** — target validation and port rules, SSRF address ranges
-  (IPv4, IPv6, transition forms), HTTP header grading, CAA inheritance,
-  registered-domain detection, email security (SPF parsing and lookup
-  counting, DMARC discovery, MTA-STS) against an in-memory DNS, the TLS port
-  guard, and risk-engine scoring and findings (`tests/unit/`).
-- **Integration tests** — the SSRF-safe HTTP client against a local server
-  (body capture, size cap, redirects, timeouts and stalled responses), and
-  the `/api/analyze` route handler (validation, success, caching, error
-  mapping, rate limiting) with the pipeline mocked (`tests/integration/`).
+- **Unit tests** (`tests/unit/`) — target validation and the port rule;
+  SSRF address ranges and DNS resolution checks; header grading; DNS
+  collection and CAA inheritance; registered-domain detection; email
+  security (SPF parsing and lookup counting, DMARC discovery, MTA-STS)
+  against an in-memory DNS; TLS certificate inspection; RDAP, IP and
+  threat-intelligence providers against a mocked `fetch`; technology
+  detection; the orchestrator with every service mocked; the risk engine;
+  rate limiting, caching, the logger, the Redis store and display helpers.
+- **Integration tests** (`tests/integration/`) — the SSRF-safe HTTP client
+  against a local server (body capture, size cap, redirects, timeouts,
+  stalled responses); the file store against a temp directory (concurrent
+  writes, corrupt files, recovery); and the API route handlers (validation,
+  caching, error mapping, rate limiting, persistence failures, SSE
+  streaming, client disconnects).
 
 No test depends on live network access.
 
@@ -339,7 +360,8 @@ sentinelscope-security/
 │   ├── validation/target.ts    # Target parsing and validation
 │   ├── dns/registrableDomain.ts # Registered domain via the Public Suffix List
 │   ├── store/                  # File store and Redis store (by id only)
-│   └── rateLimit.ts, cache.ts, store.ts, analyzeShared.ts
+│   ├── analyzeRequest.ts       # Shared rate limit / validation / error mapping
+│   └── logger.ts, rateLimit.ts, cache.ts, store.ts, redisConfig.ts, analyzeShared.ts
 ├── services/                   # dns, email, ip, tls, http, technology,
 │   │                           # domain, threat-intelligence, risk-engine
 │   └── orchestrator.ts         # Runs the pipeline

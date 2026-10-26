@@ -17,17 +17,23 @@ npm run dev
 ```bash
 npm run lint
 npm run typecheck
-npm test
+npm run test:coverage
 npm run build
 ```
 
 All four must pass — this is exactly what CI checks on every push to
-`main` and every pull request (CI also audits production dependencies).
+`main` and every pull request (CI also audits production dependencies and
+builds the Docker image). `test:coverage` fails if coverage drops below the
+thresholds in `vitest.config.mts`.
 New behavior should come with tests; tests must not depend on live network
 access (see `tests/integration/safe-request.test.ts` for running network
 code against a local server).
 
 ## Project Conventions
+
+- **Log through `lib/logger.ts`**, not `console.*`: a stable dot-separated
+  event name plus fields. Never log API keys, tokens, request bodies, or the
+  targets people analyze.
 
 - **Services own their domain.** Each provider integration lives under
   `services/<name>/` and returns a `ProviderResult<T>` — never throw for an

@@ -18,18 +18,39 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   SPF records, the lookup limit, broken includes, missing, duplicated,
   invalid, or monitoring-only DMARC policies, partial `pct`, and an unusable
   MTA-STS policy.
+- Structured JSON logging (`lib/logger.ts`, `LOG_LEVEL`).
+- An app-level error page with retry and an error reference.
+- Test coverage reporting with enforced thresholds; CI now runs tests with
+  coverage, uploads the report, and builds the Docker image.
 
 ### Changed
 
 - SPF and DMARC checks moved from DNS Configuration to Email Security; the
   former 12% DNS Configuration weight is now split 6% / 6% between them.
   Scores for the same target can differ from 1.0.0.
+- Letter grades now follow the documented risk bands (B 20–39, C 40–59,
+  D 60–79, F 80–100); some scores get a different grade than in 1.0.0.
+- If Redis is unreachable, rate limiting falls back to a per-instance limit
+  instead of failing analyze requests.
+- The two analyze endpoints share one request-handling path.
 
 ### Fixed
 
 - Domain registration data is looked up for the registered domain
   (Public Suffix List), so subdomains such as `www.example.com` no longer
   report the Domain tab as unavailable.
+- The file store no longer loses data: a failed write no longer breaks all
+  later writes, a corrupt store file is no longer overwritten, and writes
+  are atomic.
+- The in-memory result cache and rate limiter are bounded instead of
+  growing with every distinct target and client.
+- A client disconnecting from the live-progress stream no longer makes the
+  analysis fail before its result is saved.
+
+### Removed
+
+- The unused `analyzeHttp` helper and the never-produced "demo" provider
+  status.
 
 ## [1.0.0] - 2026-10-26
 
