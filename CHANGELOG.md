@@ -6,6 +6,8 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-26
+
 ### Added
 
 - Email security analysis as its own pipeline stage, dashboard tab, and
@@ -110,5 +112,6 @@ Issues found and fixed in a pre-release audit:
 - A URL with a non-standard port (e.g. `:22`) made the TLS stage connect to
   that port.
 
-[Unreleased]: https://github.com/mehmet-yuksell/sentinelscope-security/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/mehmet-yuksell/sentinelscope-security/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/mehmet-yuksell/sentinelscope-security/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/mehmet-yuksell/sentinelscope-security/releases/tag/v1.0.0

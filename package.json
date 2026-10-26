@@ -1,6 +1,6 @@
 {
   "name": "sentinelscope",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Passive security posture scanner for websites, domains and IPs: DNS, TLS, HTTP security headers, domain and IP intelligence, and threat reputation, combined into one explainable risk score.",
   "keywords": [
