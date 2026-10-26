@@ -1,11 +1,6 @@
-import { NextRequest } from "next/server";
-import { z } from "zod";
 import { runAnalysis } from "@/services/orchestrator";
-import { InvalidTargetError } from "@/lib/validation/target";
-import { SsrfBlockedError } from "@/lib/security/ssrf";
-import { saveAnalysis } from "@/lib/store";
-import { getClientIp } from "@/lib/rateLimit";
-import { rateLimiter, resultCache } from "@/lib/analyzeShared";
+import { resultCache } from "@/lib/analyzeShared";
+import { persistAnalysis, readAnalyzeRequest, toClientError } from "@/lib/analyzeRequest";
 import type { PipelineStageResult } from "@/types/analysis";
 
 export const runtime = "nodejs";
@@ -14,10 +9,10 @@ export const dynamic = "force-dynamic";
 // default 10s (ignored as a no-op on non-Vercel Node hosts).
 export const maxDuration = 60;
 
-const bodySchema = z.object({ target: z.string().trim().min(1).max(2048) });
+const encoder = new TextEncoder();
 
 function sseEvent(event: Record<string, unknown>): Uint8Array {
-  return new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
+  return encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
 }
 
 /**
@@ -25,71 +20,59 @@ function sseEvent(event: Record<string, unknown>): Uint8Array {
  * real completion as it happens, then the final normalized result. Used by
  * the analyze UI to render genuine backend progress instead of a fake timer.
  */
-export async function POST(request: NextRequest) {
-  const clientIp = getClientIp(request.headers);
-  const rate = await rateLimiter.check(clientIp);
-  if (!rate.allowed) {
-    return new Response(JSON.stringify({ error: "Rate limit exceeded. Please wait before analyzing another target." }), {
-      status: 429,
-      headers: { "Retry-After": Math.ceil(rate.retryAfterMs / 1000).toString(), "Content-Type": "application/json" },
-    });
-  }
+export async function POST(request: Request) {
+  const parsed = await readAnalyzeRequest(request);
+  if ("response" in parsed) return parsed.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: "Request body must be valid JSON." }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const parsed = bodySchema.safeParse(body);
-  if (!parsed.success) {
-    return new Response(JSON.stringify({ error: "A non-empty 'target' string is required." }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const target = parsed.data.target;
-  const cacheKey = target.toLowerCase();
+  const { target, cacheKey } = parsed;
   const cached = resultCache.get(cacheKey);
+
+  // Set once the client disconnects; later events are dropped instead of
+  // throwing from enqueue() into the middle of the pipeline. The analysis
+  // itself still finishes, so its result is cached and persisted.
+  let clientGone = false;
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      if (cached) {
-        for (const stage of cached.pipeline) {
-          controller.enqueue(sseEvent({ type: "stage", stage }));
+      const send = (event: Record<string, unknown>) => {
+        if (clientGone) return;
+        try {
+          controller.enqueue(sseEvent(event));
+        } catch {
+          clientGone = true;
         }
-        controller.enqueue(sseEvent({ type: "result", data: cached }));
-        controller.close();
+      };
+      const close = () => {
+        if (clientGone) return;
+        try {
+          controller.close();
+        } catch {
+          clientGone = true;
+        }
+      };
+
+      if (cached) {
+        for (const stage of cached.pipeline) send({ type: "stage", stage });
+        send({ type: "result", data: cached });
+        close();
         return;
       }
 
       try {
         const result = await runAnalysis(target, {
-          onStage: (stage: PipelineStageResult) => controller.enqueue(sseEvent({ type: "stage", stage })),
+          onStage: (stage: PipelineStageResult) => send({ type: "stage", stage }),
         });
         resultCache.set(cacheKey, result);
-        try {
-          await saveAnalysis(result);
-        } catch (err) {
-          // The analysis itself succeeded — don't turn persistence failure
-          // into an error event and discard a good result.
-          console.error("Failed to persist analysis result:", err);
-        }
-        controller.enqueue(sseEvent({ type: "result", data: result }));
+        await persistAnalysis(result);
+        send({ type: "result", data: result });
       } catch (err) {
-        const message =
-          err instanceof InvalidTargetError || err instanceof SsrfBlockedError
-            ? err.message
-            : "An unexpected error occurred while analyzing the target.";
-        controller.enqueue(sseEvent({ type: "error", message }));
+        send({ type: "error", message: toClientError(err).message });
       } finally {
-        controller.close();
+        close();
       }
+    },
+    cancel() {
+      clientGone = true;
     },
   });
 

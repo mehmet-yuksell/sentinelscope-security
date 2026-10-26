@@ -132,4 +132,24 @@ describe("POST /api/analyze", () => {
 
     expect(lastStatus).toBe(429);
   });
+
+  it("returns the result even when persisting it fails", async () => {
+    runAnalysisMock.mockResolvedValue(makeFakeResult("persist-fails.example"));
+    saveAnalysisMock.mockRejectedValueOnce(new Error("redis down"));
+
+    const res = await POST(postRequest({ target: "persist-fails.example" }, "1.1.1.18"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).id).toBe("fake-persist-fails.example");
+  });
+
+  it("sends Retry-After with a 429", async () => {
+    runAnalysisMock.mockImplementation(async (t: string) => makeFakeResult(t));
+    let res: Response | undefined;
+    for (let i = 0; i < 15; i++) {
+      res = await POST(postRequest({ target: `retry-after-${i}.example` }, "1.1.1.19"));
+      if (res.status === 429) break;
+    }
+    expect(res!.status).toBe(429);
+    expect(Number(res!.headers.get("Retry-After"))).toBeGreaterThan(0);
+  });
 });
