@@ -51,6 +51,70 @@ export interface DnsRecordSet {
   dmarcRecord: string | null;
 }
 
+export type SpfQualifier = "+" | "-" | "~" | "?";
+
+export interface SpfAnalysis {
+  /** The domain's SPF record, or null if there is none or more than one. */
+  record: string | null;
+  /** Number of `v=spf1` TXT records found; more than one is a permanent error (RFC 7208 §4.5). */
+  recordCount: number;
+  /** Qualifier of the top-level `all` mechanism, or null if the record has none. */
+  allQualifier: SpfQualifier | null;
+  /** Target of a `redirect=` modifier, if present. */
+  redirect: string | null;
+  /** DNS-querying terms counted through include/redirect chains; evaluation stops once past the limit. */
+  dnsLookups: number;
+  /** RFC 7208 §4.6.4: more than 10 DNS-querying terms makes SPF evaluation fail. */
+  lookupLimitExceeded: boolean;
+  /** include: targets at the top level of the record. */
+  includes: string[];
+  /** Problems found while following the record, e.g. an include with no SPF record. */
+  warnings: string[];
+}
+
+export type DmarcPolicy = "none" | "quarantine" | "reject";
+
+export interface DmarcAnalysis {
+  record: string | null;
+  /** The `_dmarc.` name the record was found at. */
+  foundAt: string | null;
+  /** True when the record came from the organizational domain rather than the hostname (RFC 7489 §6.6.3). */
+  inherited: boolean;
+  recordCount: number;
+  /** False when a record exists but has no valid `p=` tag. */
+  valid: boolean;
+  policy: DmarcPolicy | null;
+  subdomainPolicy: DmarcPolicy | null;
+  /** The policy that applies to the analyzed hostname: `sp=` when inherited and present, otherwise `p=`. */
+  effectivePolicy: DmarcPolicy | null;
+  /** Percentage of failing mail the policy applies to (default 100). */
+  pct: number;
+  /** Aggregate report destinations (`rua=`). */
+  reportingUris: string[];
+}
+
+export interface MtaStsAnalysis {
+  /** The `_mta-sts.` TXT record (`v=STSv1; id=...`), if published. */
+  record: string | null;
+  /** Mode from the policy file at https://mta-sts.<domain>/.well-known/mta-sts.txt. */
+  policyMode: "enforce" | "testing" | "none" | null;
+  policyMaxAge: number | null;
+  /** Why the policy file could not be read, when a TXT record exists but the policy is unusable. */
+  policyError: string | null;
+}
+
+export interface EmailSecurityInfo {
+  domain: string;
+  organizationalDomain: string;
+  /** True when the domain publishes MX records. */
+  receivesMail: boolean;
+  spf: SpfAnalysis;
+  dmarc: DmarcAnalysis;
+  mtaSts: MtaStsAnalysis;
+  /** The `_smtp._tls.` TLS-RPT record, if published. */
+  tlsRptRecord: string | null;
+}
+
 export interface TlsInfo {
   secure: boolean;
   tlsVersion: string | null;
@@ -161,6 +225,7 @@ export interface PipelineStageResult {
 export type PipelineStage =
   | "validation"
   | "dns"
+  | "email"
   | "ip"
   | "tls"
   | "http"
@@ -180,6 +245,8 @@ export interface AnalysisResult {
   riskLevel: RiskLevel;
   risk: RiskAssessment;
   dns: ProviderResult<DnsRecordSet>;
+  /** Absent on results stored before email security analysis existed. */
+  email?: ProviderResult<EmailSecurityInfo>;
   tls: ProviderResult<TlsInfo>;
   http: ProviderResult<HttpInfo>;
   ip: ProviderResult<IpIntelInfo>;

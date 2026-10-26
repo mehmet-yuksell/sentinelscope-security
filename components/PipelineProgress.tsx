@@ -5,6 +5,7 @@ export type LiveStageStatus = "pending" | "running" | "success" | "failed" | "sk
 export const STAGE_ORDER: PipelineStage[] = [
   "validation",
   "dns",
+  "email",
   "ip",
   "tls",
   "http",
@@ -17,6 +18,7 @@ export const STAGE_ORDER: PipelineStage[] = [
 export const STAGE_LABEL: Record<PipelineStage, string> = {
   validation: "Target Validation",
   dns: "DNS Intelligence",
+  email: "Email Security",
   ip: "IP Intelligence",
   tls: "TLS Analysis",
   http: "HTTP Analysis",
