@@ -41,23 +41,23 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@upstash/redis": "1.38.4",
+    "@upstash/redis": "1.39.0",
     "next": "16.4.3",
-    "react": "19.1.1",
-    "react-dom": "19.1.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "recharts": "2.15.1",
-    "tldts": "7.4.18",
+    "tldts": "7.4.19",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "22.15.0",
-    "@types/react": "19.1.8",
-    "@types/react-dom": "19.1.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "@vitest/coverage-v8": "5.0.5",
-    "autoprefixer": "10.4.19",
+    "autoprefixer": "10.6.1",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.3",
-    "postcss": "8.5.28",
+    "postcss": "8.5.31",
     "tailwindcss": "3.4.4",
     "typescript": "5.4.5",
     "vitest": "5.0.5"
