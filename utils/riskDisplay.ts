@@ -63,13 +63,14 @@ export type SecurityGrade = "A+" | "A" | "B" | "C" | "D" | "F";
 
 /** A letter-grade complement to the numeric score — the pattern SSL Labs and
  * SecurityHeaders.com use, and a more immediately legible signal than a bare
- * percentage for "how good is this, at a glance". */
+ * percentage for "how good is this, at a glance". Bands match the risk levels
+ * (and the Methodology page): A+/A very low, B low, C moderate, D high, F critical. */
 export function scoreToGrade(score: number): SecurityGrade {
   if (score < 5) return "A+";
   if (score < 20) return "A";
-  if (score < 35) return "B";
-  if (score < 50) return "C";
-  if (score < 70) return "D";
+  if (score < 40) return "B";
+  if (score < 60) return "C";
+  if (score < 80) return "D";
   return "F";
 }
 
