@@ -14,6 +14,8 @@ export default defineConfig({
       // React components and pages are not unit-tested and are excluded rather
       // than counted as 0%.
       include: ["app/api/**/*.ts", "lib/**/*.ts", "services/**/*.ts", "utils/**/*.ts"],
+      // A little below the current numbers, so CI fails if coverage regresses.
+      thresholds: { lines: 90, statements: 90, functions: 90, branches: 75 },
     },
   },
   resolve: {
