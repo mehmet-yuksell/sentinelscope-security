@@ -23,7 +23,7 @@ RDAP, and reputation sources. See [Security](#security) and
   provider with nothing to report is shown as *Unavailable* — never a
   plausible-looking placeholder. If no factor can be measured at all, the
   result is *Insufficient Data*, not a score.
-- **Explainable risk score.** A weighted average of seven independently
+- **Explainable risk score.** A weighted average of eight independently
   scored factors; factors without data are excluded rather than counted as
   safe. Every finding carries severity, evidence, and a concrete fix.
 - **Live pipeline.** Each stage's real completion is streamed to the browser
@@ -39,7 +39,8 @@ RDAP, and reputation sources. See [Security](#security) and
 
 | Area | What is checked |
 | --- | --- |
-| DNS | A, AAAA, MX, NS, TXT, CNAME, SOA, CAA (inherited from parent domains per RFC 8659), DMARC, SPF |
+| DNS | A, AAAA, MX, NS, TXT, CNAME, SOA, CAA (inherited from parent domains per RFC 8659) |
+| Email security | SPF (`all` policy, the 10-DNS-lookup limit across nested includes, broken includes), DMARC (policy, `sp=`, `pct=`, reporting, organizational-domain fallback), MTA-STS (record and policy file), TLS-RPT |
 | TLS | Real handshake: negotiated protocol, issuer, validity window and days remaining, SANs, trust status, self-signed detection |
 | HTTP headers | HSTS, CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy — each graded pass / warning / missing |
 | Configuration | Server/X-Powered-By version disclosure, plain-HTTP serving without a redirect to HTTPS |
@@ -60,7 +61,7 @@ any of them in depth. What it offers is a single, combined first look.
 | Primary focus | Combined posture overview | TLS server configuration | HTTP response headers | Internet-wide scan data |
 | TLS | One handshake: negotiated version and certificate | Full protocol and cipher-suite audit | — | Certificates seen in its own scans |
 | HTTP security headers | Graded | — | Graded, with policy guidance | — |
-| DNS & email auth | CAA, SPF, DMARC, NS | CAA | — | — |
+| DNS & email auth | CAA, SPF, DMARC, MTA-STS, TLS-RPT | CAA | — | — |
 | Domain registration & age | Yes (RDAP) | — | — | — |
 | Reputation | VirusTotal, AbuseIPDB (with keys) | — | — | — |
 | Open ports & services | No — by design | — | — | Yes |
@@ -93,14 +94,15 @@ flowchart TB
         direction TB
         validate["1 · Target validation"]
         dns["2 · DNS records"]
-        ip["3 · IP intelligence"]
-        tls["4 · TLS handshake"]
-        http["5 · HTTP fetch + header grading"]
-        tech["6 · Technology detection"]
-        domain["7 · Domain registration (RDAP)"]
-        ti["8 · Threat intelligence"]
-        risk["9 · Risk engine"]
-        validate --> dns --> ip --> tls --> http --> tech --> domain --> ti --> risk
+        email["3 · Email security (SPF, DMARC, MTA-STS)"]
+        ip["4 · IP intelligence"]
+        tls["5 · TLS handshake"]
+        http["6 · HTTP fetch + header grading"]
+        tech["7 · Technology detection"]
+        domain["8 · Domain registration (RDAP)"]
+        ti["9 · Threat intelligence"]
+        risk["10 · Risk engine"]
+        validate --> dns --> email --> ip --> tls --> http --> tech --> domain --> ti --> risk
     end
 
     guard{{"SSRF guard<br/>resolve · reject private/reserved · pin IP"}}
@@ -110,6 +112,7 @@ flowchart TB
 
     browser --> routes
     cache -- miss --> validate
+    email -- MTA-STS policy --> guard
     tls --> guard
     http --> guard
     guard --> target
@@ -184,17 +187,24 @@ Vercel's Upstash integration injects `KV_REST_API_URL` /
    (`lib/validation/target.ts`).
 2. **DNS** — standard record types are resolved in parallel; a missing type
    is an empty result, not an error (`services/dns`).
-3. **IP intelligence** — ASN, organization, and geolocation from a keyless
+3. **Email security** — SPF is parsed and followed through its include and
+   redirect chain to count DNS lookups; DMARC is looked up at the hostname
+   and then at the organizational domain (Public Suffix List); MTA-STS and
+   TLS-RPT records are read, and the MTA-STS policy file is fetched through
+   the SSRF guard. A failed lookup fails the stage rather than reading as
+   "no record" (`services/email`).
+4. **IP intelligence** — ASN, organization, and geolocation from a keyless
    API, plus a real reverse-DNS lookup (`services/ip`).
-4. **TLS** — a real TLS socket to the validated, pinned IP; the certificate
+5. **TLS** — a real TLS socket to the validated, pinned IP; the certificate
    is inspected (`services/tls`).
-5. **HTTP** — one SSRF-safe fetch (HTTPS first) retrieves headers and body;
+6. **HTTP** — one SSRF-safe fetch (HTTPS first) retrieves headers and body;
    headers are graded and the body is reused for technology detection
    (`services/http`, `services/technology`).
-6. **Domain** — registration data via RDAP (`services/domain`).
-7. **Threat intelligence** — VirusTotal and AbuseIPDB in parallel, if
+7. **Domain** — registration data via RDAP for the registered domain, so
+   `www.example.com` reports on `example.com` (`services/domain`).
+8. **Threat intelligence** — VirusTotal and AbuseIPDB in parallel, if
    configured (`services/threat-intelligence`).
-8. **Risk engine** — each factor is scored 0–100 independently and combined
+9. **Risk engine** — each factor is scored 0–100 independently and combined
    into a weighted average (`services/risk-engine`).
 
 ## Risk Methodology
@@ -204,10 +214,15 @@ Vercel's Upstash integration injects `KV_REST_API_URL` /
 | TLS Security | 22% |
 | HTTP Security Headers | 20% |
 | Threat Intelligence | 14% |
-| DNS Configuration | 12% |
 | Domain Reputation | 12% |
 | IP Reputation | 12% |
 | Configuration Findings | 8% |
+| DNS Configuration | 6% |
+| Email Security | 6% |
+
+Email Security is excluded for a domain that neither receives mail nor
+publishes any SPF or DMARC record. A missing MTA-STS policy is reported as
+information only and does not raise the score.
 
 A factor whose data is unavailable — no API key, a failed lookup — is
 **excluded** and the remaining weights are renormalized, so the score only
@@ -298,9 +313,10 @@ CI runs all four on every push to `main` and every pull request, plus a
 production dependency audit.
 
 - **Unit tests** — target validation and port rules, SSRF address ranges
-  (IPv4, IPv6, transition forms), HTTP header grading, CAA inheritance, the
-  TLS port guard, and risk-engine scoring and findings
-  (`tests/unit/`).
+  (IPv4, IPv6, transition forms), HTTP header grading, CAA inheritance,
+  registered-domain detection, email security (SPF parsing and lookup
+  counting, DMARC discovery, MTA-STS) against an in-memory DNS, the TLS port
+  guard, and risk-engine scoring and findings (`tests/unit/`).
 - **Integration tests** — the SSRF-safe HTTP client against a local server
   (body capture, size cap, redirects, timeouts and stalled responses), and
   the `/api/analyze` route handler (validation, success, caching, error
@@ -321,10 +337,11 @@ sentinelscope-security/
 │   ├── security/ssrf.ts        # Reserved address space checks
 │   ├── net/safeRequest.ts      # SSRF-safe HTTP client with IP pinning
 │   ├── validation/target.ts    # Target parsing and validation
+│   ├── dns/registrableDomain.ts # Registered domain via the Public Suffix List
 │   ├── store/                  # File store and Redis store (by id only)
 │   └── rateLimit.ts, cache.ts, store.ts, analyzeShared.ts
-├── services/                   # dns, ip, tls, http, technology, domain,
-│   │                           # threat-intelligence, risk-engine
+├── services/                   # dns, email, ip, tls, http, technology,
+│   │                           # domain, threat-intelligence, risk-engine
 │   └── orchestrator.ts         # Runs the pipeline
 ├── types/analysis.ts           # The normalized AnalysisResult model
 ├── utils/                      # Display helpers, browser-only history
@@ -339,10 +356,13 @@ sentinelscope-security/
   accepts.
 - **Threat intelligence needs API keys.** Without them those factors are
   *Unavailable* and excluded from the score — intentionally.
-- **Domain data is looked up for the exact hostname.** RDAP registries
-  usually have no record for subdomains such as `www.example.com`, so the
-  Domain tab reports *Unavailable* for them; analyze the registered domain
-  to get registration data.
+- **DKIM is not checked.** DKIM keys live under selectors each sender
+  chooses (`<selector>._domainkey.<domain>`), which can't be discovered from
+  DNS; guessing common selectors would report "missing" for domains that are
+  in fact signed.
+- **MTA-STS policy certificates are not validated.** The policy file is
+  fetched and parsed, but whether its HTTPS certificate would satisfy a
+  sending mail server is not checked.
 - **RDAP coverage varies by TLD**, and the keyless IP-intelligence provider
   may rate-limit; both degrade to *Unavailable*.
 - **The datacenter flag is a heuristic** based on the organization name.

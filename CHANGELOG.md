@@ -6,6 +6,31 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Email security analysis as its own pipeline stage, dashboard tab, and
+  report section: SPF (`all` policy, the RFC 7208 10-DNS-lookup limit
+  counted through nested include/redirect chains, broken or looping
+  includes), DMARC (policy, subdomain policy, `pct`, reporting addresses,
+  RFC 7489 organizational-domain fallback), MTA-STS (record and policy
+  file), and TLS-RPT.
+- An "Email Security" risk factor with findings for multiple or permissive
+  SPF records, the lookup limit, broken includes, missing, duplicated,
+  invalid, or monitoring-only DMARC policies, partial `pct`, and an unusable
+  MTA-STS policy.
+
+### Changed
+
+- SPF and DMARC checks moved from DNS Configuration to Email Security; the
+  former 12% DNS Configuration weight is now split 6% / 6% between them.
+  Scores for the same target can differ from 1.0.0.
+
+### Fixed
+
+- Domain registration data is looked up for the registered domain
+  (Public Suffix List), so subdomains such as `www.example.com` no longer
+  report the Domain tab as unavailable.
+
 ## [1.0.0] - 2026-10-26
 
 First tagged release.
