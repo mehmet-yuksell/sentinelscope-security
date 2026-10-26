@@ -21,7 +21,7 @@ export interface Finding {
   source: string;
 }
 
-export type ProviderStatus = "ok" | "unavailable" | "error" | "not_applicable" | "demo";
+export type ProviderStatus = "ok" | "unavailable" | "error" | "not_applicable";
 
 export interface ProviderResult<T> {
   status: ProviderStatus;

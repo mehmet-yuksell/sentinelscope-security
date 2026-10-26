@@ -56,7 +56,6 @@ export const PROVIDER_STATUS_LABEL: Record<ProviderStatus, string> = {
   unavailable: "Unavailable",
   error: "Error",
   not_applicable: "Not Applicable",
-  demo: "Demo Data",
 };
 
 export type SecurityGrade = "A+" | "A" | "B" | "C" | "D" | "F";

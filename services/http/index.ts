@@ -1,5 +1,5 @@
 import { safeRequest, type SafeResponse } from "@/lib/net/safeRequest";
-import type { HttpHeaderCheck, HttpInfo, ProviderResult } from "@/types/analysis";
+import type { HttpHeaderCheck, HttpInfo } from "@/types/analysis";
 
 interface HeaderCheckDefinition {
   header: string;
@@ -95,13 +95,4 @@ export function buildHttpInfo(response: SafeResponse): HttpInfo {
     server: response.headers["server"] ?? null,
     poweredBy: response.headers["x-powered-by"] ?? null,
   };
-}
-
-export async function analyzeHttp(hostname: string, preferHttps: boolean): Promise<ProviderResult<HttpInfo>> {
-  try {
-    const response = await fetchTargetPage(hostname, preferHttps);
-    return { status: "ok", data: buildHttpInfo(response) };
-  } catch (err) {
-    return { status: "error", message: (err as Error).message };
-  }
 }
