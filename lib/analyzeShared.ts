@@ -1,5 +1,6 @@
 import { TtlCache } from "@/lib/cache";
-import { MemoryRateLimiter, RedisRateLimiter, type RateLimiterLike } from "@/lib/rateLimit";
+import { FallbackRateLimiter, MemoryRateLimiter, RedisRateLimiter, type RateLimiterLike } from "@/lib/rateLimit";
+import { getRedisCredentials } from "@/lib/redisConfig";
 import type { AnalysisResult } from "@/types/analysis";
 
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX ?? 10);
@@ -9,16 +10,14 @@ const CACHE_TTL_MS = Number(process.env.ANALYSIS_CACHE_TTL_MS ?? 300_000);
 /**
  * Picks Redis-backed rate limiting when Upstash credentials are configured
  * (required for the limit to hold across serverless instances, e.g. on
- * Vercel), otherwise an in-memory limiter for a single long-running process.
+ * Vercel), with an in-memory fallback if Redis is unreachable; otherwise an
+ * in-memory limiter for a single long-running process.
  */
 function createRateLimiter(): RateLimiterLike {
-  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
-
-  if (url && token) {
-    return new RedisRateLimiter(url, token, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
-  }
-  return new MemoryRateLimiter(RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+  const memory = new MemoryRateLimiter(RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+  const redis = getRedisCredentials();
+  if (!redis) return memory;
+  return new FallbackRateLimiter(new RedisRateLimiter(redis.url, redis.token, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS), memory);
 }
 
 /**

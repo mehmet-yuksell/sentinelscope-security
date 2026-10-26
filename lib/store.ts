@@ -1,3 +1,4 @@
+import { getRedisCredentials } from "@/lib/redisConfig";
 import { createFileStore } from "@/lib/store/fileStore";
 import { createRedisStore } from "@/lib/store/redisStore";
 import type { AnalysisStore } from "@/lib/store/types";
@@ -9,13 +10,8 @@ import type { AnalysisStore } from "@/lib/store/types";
  * deployments. See lib/store/redisStore.ts and lib/store/fileStore.ts.
  */
 function createStore(): AnalysisStore {
-  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
-
-  if (url && token) {
-    return createRedisStore(url, token);
-  }
-  return createFileStore();
+  const redis = getRedisCredentials();
+  return redis ? createRedisStore(redis.url, redis.token) : createFileStore();
 }
 
 const store = createStore();
